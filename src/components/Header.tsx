@@ -53,7 +53,6 @@ export function Header() {
             </a>
           ))}
         </nav>
-        <p className="edition">2026 Edition</p>
       </div>
     </header>
   )

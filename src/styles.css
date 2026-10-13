@@ -418,8 +418,23 @@ section[id] {
   position: relative;
   isolation: isolate;
   color: var(--white);
-  padding-block: 28px 36px;
+  padding-block: 20px 24px;
   overflow: clip;
+}
+
+.hero h1 {
+  font-size: clamp(2.2rem, 5.2vw, 5.5rem);
+  margin-bottom: 0.12em;
+}
+
+.hero .eyebrow {
+  margin-bottom: 6px;
+}
+
+.hero .lede,
+.hero .tagline,
+.hero .fine {
+  margin-block: 6px;
 }
 
 .hero-bg,
@@ -454,13 +469,35 @@ section[id] {
 
 @media (min-width: 1024px) {
   .hero {
-    min-height: 760px;
+    box-sizing: border-box;
+    height: calc(100svh - var(--header-offset));
+    min-height: calc(100svh - var(--header-offset));
+    padding-block: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
   }
 
   .hero-grid {
     grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
     align-items: center;
-    min-height: 620px;
+    min-height: 0;
+  }
+
+  .hero .standings {
+    margin-top: 10px;
+  }
+
+  .hero .score-strip {
+    margin-top: 4px;
+    padding-top: 10px;
   }
 }
 
@@ -484,6 +521,18 @@ section[id] {
   margin-top: 4px;
 }
 
+@media (min-width: 1024px) {
+  .hero-actions {
+    margin: 8px 0;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 820px) {
+  .hero h1 {
+    font-size: clamp(2rem, 4.2vw, 3.6rem);
+  }
+}
+
 .fallback-note,
 .loading-stadium {
   color: var(--gold);
@@ -492,6 +541,12 @@ section[id] {
 .hero-art {
   position: relative;
   height: 420px;
+}
+
+@media (min-width: 1024px) {
+  .hero-art {
+    height: min(360px, calc(100svh - 340px));
+  }
 }
 
 @media (max-width: 767px) {
