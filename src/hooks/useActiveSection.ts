@@ -11,6 +11,7 @@ export function useActiveSection() {
   useEffect(() => {
     let frame = 0
 
+    let published: SectionId | null = null
     const update = () => {
       frame = 0
       const header = document.querySelector('.site-header')
@@ -22,6 +23,10 @@ export function useActiveSection() {
         if (section.getBoundingClientRect().top <= line) current = section.id
       }
       setActive(current)
+      if (published !== current) {
+        published = current
+        window.dispatchEvent(new CustomEvent('topgas-section', { detail: current }))
+      }
     }
 
     const onScroll = () => {

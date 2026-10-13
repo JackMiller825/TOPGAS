@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { confirmedHttps } from '../config/token.ts'
 import { useGsapEnter } from '../hooks/useGsapEnter.ts'
+import { trackCta } from '../analytics/tracker.ts'
 import { OfficialLink } from '../components/OfficialLink.tsx'
 import { useTokenConfig } from '../components/ContractAddress.tsx'
 
@@ -70,7 +71,13 @@ export function HowToBuy({ reduced }: { reduced: boolean }) {
                 <h3>{step.title}</h3>
                 <p>{step.body}</p>
                 {index === 3 && buyUrl && (
-                  <OfficialLink className="btn btn-dark" href={config.links.buy} label={`Buy ${config.displayTicker}`} pendingLabel="" />
+                  <OfficialLink
+                    className="btn btn-dark"
+                    href={config.links.buy}
+                    label={`Buy ${config.displayTicker}`}
+                    pendingLabel=""
+                    onActivate={() => trackCta('buy')}
+                  />
                 )}
               </li>
             ))}

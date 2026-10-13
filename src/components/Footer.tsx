@@ -1,3 +1,4 @@
+import { trackCta } from '../analytics/tracker.ts'
 import { navigation } from '../config/navigation.ts'
 import { confirmedHttps } from '../config/token.ts'
 import { useTokenConfig } from './ContractAddress.tsx'
@@ -28,12 +29,12 @@ export function Footer() {
         </nav>
         <div className="footer-social">
           {telegram && (
-            <a href={telegram} target="_blank" rel="noopener noreferrer">
+            <a href={telegram} target="_blank" rel="noopener noreferrer" onClick={() => trackCta('telegram')}>
               Join Telegram
             </a>
           )}
           {x && (
-            <a href={x} target="_blank" rel="noopener noreferrer">
+            <a href={x} target="_blank" rel="noopener noreferrer" onClick={() => trackCta('x')}>
               Follow on X
             </a>
           )}
@@ -45,6 +46,10 @@ export function Footer() {
       <p className="wrap footer-note">
         Independent football parody. No player or award-organizer affiliation. Token trading involves risk; no returns
         are promised.
+      </p>
+      <p className="wrap footer-note">
+        Estimated visitor counts use a first-party cookie while a tab is visible. If this host supplies an IP address,
+        it is encrypted and deleted after 30 days. Do Not Track and Global Privacy Control requests are not stored.
       </p>
     </footer>
   )

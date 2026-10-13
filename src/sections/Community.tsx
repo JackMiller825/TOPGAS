@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { trackCta } from '../analytics/tracker.ts'
 import { confirmedHttps } from '../config/token.ts'
 import { useTokenConfig } from '../components/ContractAddress.tsx'
 import { ArtImage } from '../components/ArtImage.tsx'
@@ -52,14 +53,20 @@ export function Community({ reduced }: { reduced: boolean }) {
               href={config.links.telegram}
               label="Join Telegram"
               pendingLabel="Telegram · link pending"
-              onActivate={cheer}
+              onActivate={() => {
+                trackCta('telegram')
+                cheer()
+              }}
             />
             <OfficialLink
               className="btn btn-ghost"
               href={config.links.x}
               label="Follow on X"
               pendingLabel="X · link pending"
-              onActivate={cheer}
+              onActivate={() => {
+                trackCta('x')
+                cheer()
+              }}
             />
             <button type="button" className="btn btn-gold" onClick={cheer}>
               Make some noise ⚽

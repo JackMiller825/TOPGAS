@@ -31,3 +31,19 @@ npm run lint
 ```
 
 Dev server path: `http://localhost:5173/TOPGAS/`. Add `?fixture=confirmed` in development to exercise copy-address and confirmed-link states. That fixture is removed from production builds.
+
+## Visitor dashboard
+
+GitHub Pages only serves the static site. It cannot check a password, keep a session, or store visitor records. The public Pages site stays at the URL above. The password dashboard runs only when this Node server is the host.
+
+The server needs Node 24. One-time setup reads `DASHBOARD_PASSWORD` from the environment, stores a hash in `data/analytics.sqlite`, and writes generated session and encryption keys to `data/secrets.json`. Those files are not committed. Setup does not replace a password that is already stored.
+
+```bash
+npm run setup
+npm run build
+npm start
+```
+
+Local URLs when the server is running: `http://127.0.0.1:4173/TOPGAS/` and `http://127.0.0.1:4173/dashboard`. `npm run dev` exposes the same API for local development. Development and localhost traffic is excluded from the default counts; use the dashboard toggle to include it.
+
+If a TLS proxy terminates HTTPS in front of the Node process, set `TRUST_PROXY=1`, `TRUSTED_PROXIES` to that proxy's connecting address, and optionally `TRUSTED_IP_HEADER` (default `cf-connecting-ip`). Without that, visitor IPs are stored as unavailable and the session cookie is not marked Secure. This password does not replace a hosting platform's own sign-in.

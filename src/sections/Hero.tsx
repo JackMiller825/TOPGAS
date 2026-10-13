@@ -3,6 +3,7 @@ import { token } from '../config/token.ts'
 import { requestSpin, setPointerTilt, subscribeStadiumReady } from '../three/stadiumSignals.ts'
 import { useTokenConfig } from '../components/ContractAddress.tsx'
 import { ArtImage } from '../components/ArtImage.tsx'
+import { trackCta } from '../analytics/tracker.ts'
 import { OfficialLink } from '../components/OfficialLink.tsx'
 import { Standings } from '../components/Standings.tsx'
 
@@ -78,12 +79,14 @@ export function Hero({ ballRef, show3d, saveData, reduced }: HeroProps) {
                 href={config.links.buy}
                 label={`Buy ${config.displayTicker}`}
                 pendingLabel={`Buy ${config.displayTicker} · link pending`}
+                onActivate={() => trackCta('buy')}
               />
               <OfficialLink
                 className="btn btn-ghost"
                 href={config.links.chart}
                 label="View chart"
                 pendingLabel="Chart · link pending"
+                onActivate={() => trackCta('chart')}
               />
             </div>
             {show3d && (

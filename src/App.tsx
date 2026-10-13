@@ -1,4 +1,6 @@
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { startPublicAnalytics } from './analytics/tracker.ts'
+import { isDashboardLocation } from './dashboard/path.ts'
 import { Header } from './components/Header.tsx'
 import { Footer } from './components/Footer.tsx'
 import { FAQ } from './components/FAQ.tsx'
@@ -16,8 +18,42 @@ import { useSaveData } from './hooks/useSaveData.ts'
 import { detectWebGL } from './hooks/webgl.ts'
 
 const StadiumExperience = lazy(() => import('./three/StadiumExperience.tsx'))
+const Dashboard = lazy(() => import('./dashboard/Dashboard.tsx'))
 
 export default function App() {
+  const [dashboard, setDashboard] = useState(() => isDashboardLocation())
+
+  useEffect(() => {
+    const sync = () => setDashboard(isDashboardLocation())
+    window.addEventListener('popstate', sync)
+    return () => window.removeEventListener('popstate', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!dashboard) return
+    const meta = document.querySelector('meta[name="robots"]')
+    const previous = meta?.getAttribute('content') ?? null
+    meta?.setAttribute('content', 'noindex, nofollow')
+    const previousTitle = document.title
+    document.title = 'Private Visitor Dashboard'
+    return () => {
+      if (previous) meta?.setAttribute('content', previous)
+      document.title = previousTitle
+    }
+  }, [dashboard])
+
+  if (dashboard) {
+    return (
+      <Suspense fallback={<main className="dash"><p>Loading dashboard…</p></main>}>
+        <Dashboard />
+      </Suspense>
+    )
+  }
+
+  return <PublicSite />
+}
+
+function PublicSite() {
   const ballRef = useRef<HTMLDivElement>(null)
   const pitchRef = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
@@ -26,6 +62,8 @@ export default function App() {
   const [webglOk, setWebglOk] = useState(detectWebGL)
   const show3d = webglOk && !saveData
   useHashAlignment()
+
+  useEffect(() => startPublicAnalytics(), [])
 
   return (
     <ContenderProvider>

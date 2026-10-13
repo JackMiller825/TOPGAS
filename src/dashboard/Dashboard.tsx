@@ -1,0 +1,646 @@
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { api, errorMessage } from './api.ts'
+
+type Filters = {
+  range: 'today' | '24h' | '7d' | 'custom'
+  from: string
+  to: string
+  campaign: string
+  referrer: string
+  bots: boolean
+  tests: boolean
+}
+
+type Summary = {
+  activeVisitors: number
+  browserVisitors: number
+  visits: number
+  pageViews: number
+  clicks: { buy: number; chart: number; telegram: number; x: number; total: number }
+  trend: { start: number; label: string; visits: number }[]
+  referrals: { host: string; visits: number }[]
+  campaigns: { source: string; medium: string; campaign: string; visits: number }[]
+  generatedAt: number
+}
+
+type Visit = {
+  id: string
+  visitorId: string
+  startedAt: number
+  lastSeen: number
+  path: string
+  section: string | null
+  browser: string
+  os: string
+  device: string
+  referrer: string
+  utmSource: string | null
+  utmMedium: string | null
+  utmCampaign: string | null
+  classification: string
+  ip: string
+  ipAvailable: boolean
+  pageViews?: { path: string; createdAt: number }[]
+  clicks?: { kind: string; createdAt: number }[]
+}
+
+const initialFilters: Filters = {
+  range: 'today',
+  from: '',
+  to: '',
+  campaign: '',
+  referrer: '',
+  bots: false,
+  tests: false,
+}
+
+function formatNy(ms: number): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }).format(ms)
+}
+
+function queryString(filters: Filters, extra: Record<string, string> = {}): string {
+  const params = new URLSearchParams()
+  params.set('range', filters.range)
+  if (filters.range === 'custom') {
+    if (filters.from) params.set('from', filters.from)
+    if (filters.to) params.set('to', filters.to)
+  }
+  if (filters.campaign.trim()) params.set('campaign', filters.campaign.trim())
+  if (filters.referrer.trim()) params.set('referrer', filters.referrer.trim())
+  if (filters.bots) params.set('bots', '1')
+  if (filters.tests) params.set('tests', '1')
+  for (const [key, value] of Object.entries(extra)) params.set(key, value)
+  return params.toString()
+}
+
+export default function Dashboard() {
+  const [csrf, setCsrf] = useState('')
+  const [phase, setPhase] = useState<'checking' | 'login' | 'ready'>('checking')
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loginNotice, setLoginNotice] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [filters, setFilters] = useState<Filters>(initialFilters)
+  const [applied, setApplied] = useState<Filters>(initialFilters)
+  const [summary, setSummary] = useState<Summary | null>(null)
+  const summaryRef = useRef<Summary | null>(null)
+  const [visits, setVisits] = useState<Visit[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [error, setError] = useState('')
+  const [stale, setStale] = useState(false)
+  const [refreshedAt, setRefreshedAt] = useState<number | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [detail, setDetail] = useState<Visit | null>(null)
+  const [revealed, setRevealed] = useState<Record<string, string>>({})
+  const [notice, setNotice] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [includeIps, setIncludeIps] = useState(false)
+  const pageSize = 25
+
+  const load = useCallback(async (nextPage: number, nextFilters: Filters) => {
+    const summaryResult = await api<Summary & { error?: string }>(`/api/dashboard/analytics/summary?${queryString(nextFilters)}`)
+    if (summaryResult.status === 401) {
+      summaryRef.current = null
+      setPhase('login')
+      setLoginNotice('')
+      setError('')
+      return
+    }
+    const visitResult = await api<{ visits: Visit[]; total: number; error?: string }>(
+      `/api/dashboard/analytics/visits?${queryString(nextFilters, { page: String(nextPage), pageSize: String(pageSize) })}`,
+    )
+    if (!summaryResult.ok || !visitResult.ok) {
+      setError(errorMessage(summaryResult.status, summaryResult.data, 'Visitor estimates could not be loaded.'))
+      setStale(Boolean(summaryRef.current))
+      return
+    }
+    summaryRef.current = summaryResult.data
+    setSummary(summaryResult.data)
+    setVisits(visitResult.data.visits ?? [])
+    setTotal(visitResult.data.total ?? 0)
+    setPage(nextPage)
+    setError('')
+    setStale(false)
+    setRefreshedAt(summaryResult.data.generatedAt ?? Date.now())
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void api<{ authenticated: boolean; csrfToken?: string; error?: string }>('/api/dashboard/session').then((result) => {
+      if (cancelled) return
+      if (!result.ok || !result.data.csrfToken) {
+        setLoginError(errorMessage(result.status, result.data, 'The dashboard service is unavailable on this host.'))
+        setPhase('login')
+        return
+      }
+      setCsrf(result.data.csrfToken)
+      setPhase(result.data.authenticated ? 'ready' : 'login')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (phase !== 'ready' || !csrf) return
+    void load(page, applied)
+    const tick = () => {
+      if (document.visibilityState !== 'visible') return
+      void load(page, applied)
+    }
+    const timer = window.setInterval(tick, 10000)
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [phase, csrf, applied, page, load])
+
+  async function onLogin(event: FormEvent) {
+    event.preventDefault()
+    setSubmitting(true)
+    setLoginError('')
+    const result = await api<{ ok?: boolean; csrfToken?: string; error?: string }>('/api/dashboard/login', {
+      method: 'POST',
+      csrf,
+      body: { password },
+    })
+    setSubmitting(false)
+    if (!result.ok || !result.data.csrfToken) {
+      setLoginError(errorMessage(result.status, result.data, 'Incorrect password. Please try again.'))
+      return
+    }
+    setCsrf(result.data.csrfToken)
+    setPassword('')
+    setLoginNotice('')
+    setPhase('ready')
+  }
+
+  async function logout() {
+    await api('/api/dashboard/logout', { method: 'POST', csrf, body: {} })
+    setPhase('login')
+    setSummary(null)
+    setVisits([])
+    setDetail(null)
+    setNotice('')
+    const session = await api<{ csrfToken?: string }>('/api/dashboard/session')
+    if (session.data.csrfToken) setCsrf(session.data.csrfToken)
+  }
+
+  async function onPasswordChange(event: FormEvent) {
+    event.preventDefault()
+    const result = await api<{ message?: string; error?: string }>('/api/dashboard/change-password', {
+      method: 'POST',
+      csrf,
+      body: { currentPassword, newPassword, confirmPassword },
+    })
+    if (!result.ok) {
+      setNotice(errorMessage(result.status, result.data, 'Password was not changed.'))
+      return
+    }
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setSummary(null)
+    setPhase('login')
+    setLoginNotice(result.data.message ?? 'Password changed. Sign in with the new password.')
+    const session = await api<{ csrfToken?: string }>('/api/dashboard/session')
+    if (session.data.csrfToken) setCsrf(session.data.csrfToken)
+  }
+
+  async function reveal(id: string) {
+    if (revealed[id]) {
+      setRevealed((current) => {
+        const next = { ...current }
+        delete next[id]
+        return next
+      })
+      return
+    }
+    const result = await api<Visit>(`/api/dashboard/analytics/visits/${id}?reveal=1`)
+    if (!result.ok) {
+      setNotice(errorMessage(result.status, result.data, 'The IP address could not be revealed.'))
+      return
+    }
+    setRevealed((current) => ({ ...current, [id]: result.data.ip }))
+  }
+
+  async function openDetail(id: string) {
+    const result = await api<Visit>(`/api/dashboard/analytics/visits/${id}`)
+    if (!result.ok) {
+      setNotice(errorMessage(result.status, result.data, 'Visit details could not be loaded.'))
+      return
+    }
+    setDetail(result.data)
+  }
+
+  async function removeSelected() {
+    const result = await api<{ deleted?: number; error?: string }>('/api/dashboard/analytics/delete', {
+      method: 'POST',
+      csrf,
+      body: { ids: selected },
+    })
+    if (!result.ok) {
+      setNotice(errorMessage(result.status, result.data, 'Those visits could not be deleted.'))
+      return
+    }
+    setNotice(`Deleted ${result.data.deleted ?? selected.length} visits.`)
+    setSelected([])
+    setConfirmDelete(false)
+    setDetail(null)
+    await load(1, applied)
+  }
+
+  async function exportCsv() {
+    const response = await fetch(`/api/dashboard/analytics/export?${queryString(applied, includeIps ? { reveal: '1' } : {})}`, {
+      headers: { 'x-csrf-token': csrf, accept: 'text/csv' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    })
+    if (!response.ok) {
+      setNotice('The CSV export could not be downloaded.')
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'topgas-visits.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+    setNotice('Export downloaded.')
+  }
+
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  const maxTrend = Math.max(1, ...(summary?.trend.map((bucket) => bucket.visits) ?? [1]))
+
+  if (phase !== 'ready') {
+    return (
+      <main className="dash" id="dashboard-main">
+        <h1>Private Visitor Dashboard</h1>
+        {phase === 'checking' ? (
+          <p role="status">Checking session…</p>
+        ) : (
+          <form className="dash-card" onSubmit={onLogin}>
+            {loginNotice && <p role="status">{loginNotice}</p>}
+            <label htmlFor="dashboard-password">Password</label>
+            <input
+              id="dashboard-password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+            <button className="btn btn-gold" type="submit" disabled={submitting || !csrf}>
+              Open dashboard
+            </button>
+            {loginError && (
+              <p id="dashboard-login-error" role="alert">
+                {loginError}
+              </p>
+            )}
+          </form>
+        )}
+      </main>
+    )
+  }
+
+  return (
+    <main className="dash" id="dashboard-main">
+      <div className="dash-top">
+        <h1>Private Visitor Dashboard</h1>
+        <button className="btn btn-ghost" type="button" onClick={() => void logout()}>
+          Log out
+        </button>
+      </div>
+      <p className="dash-note">Counts are estimates. Times are shown in America/New_York.</p>
+      {notice && <p role="status">{notice}</p>}
+      <form
+        className="dash-filters"
+        onSubmit={(event) => {
+          event.preventDefault()
+          setApplied(filters)
+          setPage(1)
+          setConfirmDelete(false)
+        }}
+      >
+        <label>
+          Range
+          <select
+            value={filters.range}
+            onChange={(event) => setFilters({ ...filters, range: event.target.value as Filters['range'] })}
+          >
+            <option value="today">Today in New York</option>
+            <option value="24h">Rolling last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="custom">Custom range</option>
+          </select>
+        </label>
+        {filters.range === 'custom' && (
+          <>
+            <label>
+              From
+              <input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} required />
+            </label>
+            <label>
+              To
+              <input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} required />
+            </label>
+          </>
+        )}
+        <label>
+          Campaign
+          <input value={filters.campaign} onChange={(event) => setFilters({ ...filters, campaign: event.target.value })} />
+        </label>
+        <label>
+          Referrer
+          <input value={filters.referrer} onChange={(event) => setFilters({ ...filters, referrer: event.target.value })} />
+        </label>
+        <label className="dash-check">
+          <input
+            type="checkbox"
+            checked={filters.bots}
+            onChange={(event) => {
+              const next = { ...filters, bots: event.target.checked }
+              setFilters(next)
+              setApplied(next)
+            }}
+          />
+          Include likely bots
+        </label>
+        <label className="dash-check">
+          <input
+            type="checkbox"
+            checked={filters.tests}
+            onChange={(event) => {
+              const next = { ...filters, tests: event.target.checked }
+              setFilters(next)
+              setApplied(next)
+            }}
+          />
+          Include admin and development traffic
+        </label>
+        <button className="btn btn-gold" type="submit">
+          Apply filters
+        </button>
+      </form>
+
+      {!summary && !error && <p role="status">Loading visitor estimates…</p>}
+      {error && (
+        <p role="alert">
+          {stale ? 'Latest refresh failed. Showing the last successful numbers. ' : ''}
+          {error}{' '}
+          <button type="button" onClick={() => void load(page, applied)}>
+            Retry
+          </button>
+        </p>
+      )}
+      {summary && (
+        <>
+          <p className="dash-refresh">
+            Last successful refresh: {refreshedAt ? formatNy(refreshedAt) : 'Not yet'}
+            {stale ? ' (stale)' : ''}
+          </p>
+          <section className="dash-stats" aria-label="Summary">
+            <article>
+              <p>Estimated active visitors</p>
+              <strong>{summary.activeVisitors}</strong>
+            </article>
+            <article>
+              <p>Browser visitors</p>
+              <strong>{summary.browserVisitors}</strong>
+            </article>
+            <article>
+              <p>Visits</p>
+              <strong>{summary.visits}</strong>
+            </article>
+            <article>
+              <p>Page views</p>
+              <strong>{summary.pageViews}</strong>
+            </article>
+            <article>
+              <p>CTA clicks</p>
+              <strong>{summary.clicks.total}</strong>
+              <span>
+                Buy {summary.clicks.buy} · Chart {summary.clicks.chart} · Telegram {summary.clicks.telegram} · X {summary.clicks.x}
+              </span>
+            </article>
+          </section>
+          <section className="dash-card" aria-labelledby="trend-heading">
+            <h2 id="trend-heading">Visit trend</h2>
+            {summary.trend.every((bucket) => bucket.visits === 0) ? (
+              <p>No visits in this range.</p>
+            ) : (
+              <ol className="dash-trend">
+                {summary.trend.map((bucket) => (
+                  <li key={bucket.start}>
+                    <span>{bucket.label}</span>
+                    <span className="dash-bar" style={{ width: `${Math.max(4, (bucket.visits / maxTrend) * 100)}%` }} />
+                    <span>{bucket.visits}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+          <div className="dash-split">
+            <section className="dash-card" aria-labelledby="referrer-heading">
+              <h2 id="referrer-heading">Referrals</h2>
+              {summary.referrals.length === 0 ? <p>No referrals in this range.</p> : (
+                <ul>
+                  {summary.referrals.map((row) => (
+                    <li key={row.host}>
+                      {row.host}: {row.visits}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className="dash-card" aria-labelledby="campaign-heading">
+              <h2 id="campaign-heading">Campaigns</h2>
+              {summary.campaigns.length === 0 ? <p>No campaigns in this range.</p> : (
+                <ul>
+                  {summary.campaigns.map((row) => (
+                    <li key={`${row.source}-${row.medium}-${row.campaign}`}>
+                      {[row.source, row.medium, row.campaign].filter(Boolean).join(' / ') || '(blank)'}: {row.visits}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        </>
+      )}
+
+      <section className="dash-card" aria-labelledby="history-heading">
+        <div className="dash-top">
+          <h2 id="history-heading">Visit history</h2>
+          <div className="dash-actions">
+            <label className="dash-check">
+              <input type="checkbox" checked={includeIps} onChange={(event) => setIncludeIps(event.target.checked)} />
+              Include full IP addresses in the export
+            </label>
+            <button className="btn btn-ghost" type="button" onClick={() => void exportCsv()}>
+              Export CSV
+            </button>
+            <button className="btn btn-dark" type="button" disabled={selected.length === 0} onClick={() => setConfirmDelete(true)}>
+              Delete selected
+            </button>
+          </div>
+        </div>
+        {confirmDelete && (
+          <p>
+            Delete {selected.length} selected visits?
+            <button type="button" onClick={() => void removeSelected()}>
+              Confirm delete
+            </button>
+            <button type="button" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </button>
+          </p>
+        )}
+        {summary && visits.length === 0 && <p>No visits in this range.</p>}
+        <div className="dash-table-wrap">
+          <table>
+            <caption>Visits for the selected filters</caption>
+            <thead>
+              <tr>
+                <th scope="col">Select</th>
+                <th scope="col">IP</th>
+                <th scope="col">Visit start</th>
+                <th scope="col">Last seen</th>
+                <th scope="col">Page and section</th>
+                <th scope="col">Browser and device</th>
+                <th scope="col">Referral</th>
+                <th scope="col">Traffic</th>
+                <th scope="col">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visits.map((visit) => (
+                <tr key={visit.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(visit.id)}
+                      aria-label={`Select visit ${visit.id}`}
+                      onChange={(event) => {
+                        setSelected((current) =>
+                          event.target.checked ? [...current, visit.id] : current.filter((id) => id !== visit.id),
+                        )
+                      }}
+                    />
+                  </td>
+                  <td>
+                    {revealed[visit.id] ?? visit.ip}
+                    <button type="button" onClick={() => void reveal(visit.id)} disabled={!visit.ipAvailable && !revealed[visit.id]}>
+                      {revealed[visit.id] ? 'Hide IP' : 'Reveal IP'}
+                    </button>
+                  </td>
+                  <td>{formatNy(visit.startedAt)}</td>
+                  <td>{formatNy(visit.lastSeen)}</td>
+                  <td>
+                    {visit.path}
+                    {visit.section ? ` · ${visit.section}` : ''}
+                  </td>
+                  <td>
+                    {visit.browser} / {visit.os} / {visit.device}
+                  </td>
+                  <td>
+                    {visit.referrer}
+                    {visit.utmCampaign ? ` · ${visit.utmCampaign}` : ''}
+                  </td>
+                  <td>{visit.classification}</td>
+                  <td>
+                    <button type="button" onClick={() => void openDetail(visit.id)}>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="dash-pager">
+          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+            Previous
+          </button>
+          <span>
+            Page {page} of {pages}
+          </span>
+          <button type="button" disabled={page >= pages} onClick={() => setPage((current) => current + 1)}>
+            Next
+          </button>
+        </div>
+        {detail && (
+          <article className="dash-detail" aria-labelledby="detail-heading">
+            <h3 id="detail-heading">Visit details</h3>
+            <p>
+              {detail.path} · {detail.section ?? 'no section'} · {detail.classification}
+            </p>
+            <p>Started {formatNy(detail.startedAt)}. Last seen {formatNy(detail.lastSeen)}.</p>
+            <h4>Page views</h4>
+            {(detail.pageViews ?? []).length === 0 ? <p>No page views stored.</p> : (
+              <ul>
+                {detail.pageViews?.map((view) => (
+                  <li key={`${view.createdAt}-${view.path}`}>
+                    {formatNy(view.createdAt)} · {view.path}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h4>CTA clicks</h4>
+            {(detail.clicks ?? []).length === 0 ? <p>No CTA clicks stored.</p> : (
+              <ul>
+                {detail.clicks?.map((click) => (
+                  <li key={`${click.createdAt}-${click.kind}`}>
+                    {formatNy(click.createdAt)} · {click.kind}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button type="button" onClick={() => setDetail(null)}>
+              Close details
+            </button>
+          </article>
+        )}
+      </section>
+
+      <section className="dash-card">
+        <h2>Change password</h2>
+        <form className="dash-password" onSubmit={onPasswordChange}>
+          <label>
+            Current password
+            <input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required />
+          </label>
+          <label>
+            New password
+            <input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required minLength={8} />
+          </label>
+          <label>
+            Confirm new password
+            <input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={8} />
+          </label>
+          <button className="btn btn-gold" type="submit">
+            Change password
+          </button>
+        </form>
+      </section>
+    </main>
+  )
+}
