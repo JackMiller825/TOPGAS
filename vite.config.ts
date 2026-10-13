@@ -23,13 +23,15 @@ function pagesFallback(): Plugin {
       const css = names.find((name) => /^index-.*\.css$/.test(name))
       if (js) {
         fs.copyFileSync(path.join(assets, js), path.join(legacy, 'index-CyUzMM2u.js'))
-        for (const legacyName of ['index-BSCVoLQC.js', 'index-DTk6TEgC.js', 'index-C6lwwhIU.js']) {
+        for (const legacyName of ['index-BSCVoLQC.js', 'index-DTk6TEgC.js', 'index-C6lwwhIU.js', 'index-B3_Wx4lq.js']) {
           if (js !== legacyName) fs.copyFileSync(path.join(assets, js), path.join(assets, legacyName))
         }
       }
       if (css) {
         fs.copyFileSync(path.join(assets, css), path.join(legacy, 'index-D85W7KUC.css'))
-        if (css !== 'index-CpIg0DWG.css') fs.copyFileSync(path.join(assets, css), path.join(assets, 'index-CpIg0DWG.css'))
+        for (const legacyName of ['index-CpIg0DWG.css', 'index-BAgfaOav.css']) {
+          if (css !== legacyName) fs.copyFileSync(path.join(assets, css), path.join(assets, legacyName))
+        }
       }
       const images = path.join(assets, 'topgas')
       if (fs.existsSync(images)) fs.cpSync(images, path.join(legacy, 'topgas'), { recursive: true })

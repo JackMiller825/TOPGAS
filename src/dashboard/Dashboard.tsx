@@ -346,6 +346,7 @@ export default function Dashboard() {
           setConfirmDelete(false)
         }}
       >
+        <div className="dash-filter-fields">
         <label>
           Range
           <select
@@ -378,6 +379,8 @@ export default function Dashboard() {
           Referrer
           <input value={filters.referrer} onChange={(event) => setFilters({ ...filters, referrer: event.target.value })} />
         </label>
+        </div>
+        <div className="dash-filter-actions">
         <label className="dash-check">
           <input
             type="checkbox"
@@ -405,6 +408,7 @@ export default function Dashboard() {
         <button className="btn btn-gold" type="submit">
           Apply filters
         </button>
+        </div>
       </form>
 
       {!summary && !error && <p role="status">Loading visitor estimates…</p>}
@@ -444,12 +448,17 @@ export default function Dashboard() {
               <strong>{summary.pageViews}</strong>
               <span>Loads and reloads</span>
             </article>
-            <article>
-              <p>CTA clicks</p>
-              <strong>{summary.clicks.total}</strong>
-              <span>
-                Buy {summary.clicks.buy} · Chart {summary.clicks.chart} · Telegram {summary.clicks.telegram} · X {summary.clicks.x}
-              </span>
+            <article className="dash-cta">
+              <div>
+                <p>CTA clicks</p>
+                <strong>{summary.clicks.total}</strong>
+              </div>
+              <ul className="cta-chips">
+                <li><span>Buy</span><strong>{summary.clicks.buy}</strong></li>
+                <li><span>Chart</span><strong>{summary.clicks.chart}</strong></li>
+                <li><span>Telegram</span><strong>{summary.clicks.telegram}</strong></li>
+                <li><span>X</span><strong>{summary.clicks.x}</strong></li>
+              </ul>
             </article>
           </section>
           <section className="dash-card" aria-labelledby="trend-heading">
@@ -463,16 +472,32 @@ export default function Dashboard() {
             {summary.trend.every((bucket) => bucket.visitors === 0) ? (
               <p>No visitors in this range.</p>
             ) : (
-              <div className="trend-chart" role="list" aria-label="Unique visitors over time">
-                {summary.trend.map((bucket) => (
-                  <div role="listitem" className="trend-col" key={bucket.start} title={`${bucket.label}: ${bucket.visitors} unique visitors`}>
-                    <span className="trend-count">{bucket.visitors > 0 ? bucket.visitors : ''}</span>
-                    <span className="trend-bar" aria-hidden="true">
-                      <span style={{ height: `${Math.max(bucket.visitors > 0 ? 8 : 0, (bucket.visitors / maxTrend) * 100)}%` }} />
-                    </span>
-                    <span className="trend-label">{bucket.label}</span>
-                  </div>
-                ))}
+              <div
+                className="trend-chart"
+                role="list"
+                aria-label="Unique visitors over time"
+                style={{ gridTemplateColumns: `repeat(${summary.trend.length}, minmax(0, 1fr))` }}
+              >
+                {summary.trend.map((bucket, index) => {
+                  const isPeak = Boolean(peak && bucket.start === peak.start && bucket.visitors > 0)
+                  const labelStep = summary.trend.length > 18 ? 3 : 1
+                  const showLabel = index % labelStep === 0 || isPeak || index === summary.trend.length - 1
+                  const height = bucket.visitors === 0 ? 0 : Math.max(14, (bucket.visitors / maxTrend) * 100)
+                  return (
+                    <div
+                      role="listitem"
+                      className={isPeak ? 'trend-col is-peak' : bucket.visitors > 0 ? 'trend-col' : 'trend-col is-zero'}
+                      key={bucket.start}
+                      title={`${bucket.label}: ${bucket.visitors} unique visitors`}
+                    >
+                      <span className="trend-count">{bucket.visitors > 0 ? bucket.visitors : ''}</span>
+                      <span className="trend-bar" aria-hidden="true">
+                        <span style={{ height: `${height}%` }} />
+                      </span>
+                      <span className={showLabel ? 'trend-label' : 'trend-label is-hidden'}>{bucket.label}</span>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </section>
@@ -505,9 +530,12 @@ export default function Dashboard() {
         </>
       )}
 
-      <section className="dash-card" aria-labelledby="history-heading">
-        <div className="dash-top">
-          <h2 id="history-heading">Visit history</h2>
+      <section className="dash-card dash-history" aria-labelledby="history-heading">
+        <div className="history-head">
+          <div>
+            <h2 id="history-heading">Visit history</h2>
+            <p className="dash-quiet">Location is the city, region, and country for each visit.</p>
+          </div>
           <div className="dash-actions">
             <label className="dash-check">
               <input type="checkbox" checked={includeIps} onChange={(event) => setIncludeIps(event.target.checked)} />
@@ -522,7 +550,7 @@ export default function Dashboard() {
           </div>
         </div>
         {confirmDelete && (
-          <p>
+          <p className="dash-confirm">
             Delete {selected.length} selected visits?
             <button type="button" onClick={() => void removeSelected()}>
               Confirm delete
@@ -533,69 +561,49 @@ export default function Dashboard() {
           </p>
         )}
         {summary && visits.length === 0 && <p>No visits in this range.</p>}
-        <div className="dash-table-wrap">
-          <table>
-            <caption>Visits for the selected filters</caption>
-            <thead>
-              <tr>
-                <th scope="col">Select</th>
-                <th scope="col">IP</th>
-                <th scope="col">Location</th>
-                <th scope="col">Visit start</th>
-                <th scope="col">Last seen</th>
-                <th scope="col">Page and section</th>
-                <th scope="col">Browser and device</th>
-                <th scope="col">Referral</th>
-                <th scope="col">Traffic</th>
-                <th scope="col">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visits.map((visit) => (
-                <tr key={visit.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(visit.id)}
-                      aria-label={`Select visit ${visit.id}`}
-                      onChange={(event) => {
-                        setSelected((current) =>
-                          event.target.checked ? [...current, visit.id] : current.filter((id) => id !== visit.id),
-                        )
-                      }}
-                    />
-                  </td>
-                  <td>
-                    {revealed[visit.id] ?? visit.ip}
-                    <button type="button" onClick={() => void reveal(visit.id)} disabled={!visit.ipAvailable && !revealed[visit.id]}>
-                      {revealed[visit.id] ? 'Hide IP' : 'Reveal IP'}
-                    </button>
-                  </td>
-                  <td>{visit.location || 'Unavailable'}</td>
-                  <td>{formatNy(visit.startedAt)}</td>
-                  <td>{formatNy(visit.lastSeen)}</td>
-                  <td>
-                    {visit.path}
-                    {visit.section ? ` · ${visit.section}` : ''}
-                  </td>
-                  <td>
-                    {visit.browser} / {visit.os} / {visit.device}
-                  </td>
-                  <td>
-                    {visit.referrer}
-                    {visit.utmCampaign ? ` · ${visit.utmCampaign}` : ''}
-                  </td>
-                  <td>{visit.classification}</td>
-                  <td>
-                    <button type="button" onClick={() => void openDetail(visit.id)}>
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="visit-list">
+          {visits.map((visit) => (
+            <li className="visit-row" key={visit.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(visit.id)}
+                aria-label={`Select visit ${visit.id}`}
+                onChange={(event) => {
+                  setSelected((current) =>
+                    event.target.checked ? [...current, visit.id] : current.filter((id) => id !== visit.id),
+                  )
+                }}
+              />
+              <div className="visit-main">
+                <div className="visit-headline">
+                  <strong className="visit-place">{visit.location || 'Unavailable'}</strong>
+                  <span className="visit-badge">{visit.classification}</span>
+                </div>
+                <p className="visit-when">
+                  Started {formatNy(visit.startedAt)} · Last seen {formatNy(visit.lastSeen)}
+                </p>
+                <p className="visit-meta">
+                  {visit.path}
+                  {visit.section ? ` · ${visit.section}` : ''}
+                  {' · '}
+                  {visit.browser} / {visit.os} / {visit.device}
+                  {' · '}
+                  {visit.referrer}
+                  {visit.utmCampaign ? ` · ${visit.utmCampaign}` : ''}
+                </p>
+              </div>
+              <div className="visit-actions">
+                <span className="visit-ip">{revealed[visit.id] ?? visit.ip}</span>
+                <button type="button" onClick={() => void reveal(visit.id)} disabled={!visit.ipAvailable && !revealed[visit.id]}>
+                  {revealed[visit.id] ? 'Hide IP' : 'Reveal IP'}
+                </button>
+                <button type="button" onClick={() => void openDetail(visit.id)}>
+                  View
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
         <div className="dash-pager">
           <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
             Previous
