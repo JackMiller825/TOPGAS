@@ -244,7 +244,7 @@ function PitchScene({ reduced, compact }: { reduced: boolean; compact: boolean }
 }
 
 type StadiumExperienceProps = {
-  ballRef: RefObject<HTMLDivElement | null>
+  ballRefs: RefObject<Array<HTMLDivElement | null>>
   pitchRef: RefObject<HTMLDivElement | null>
   reduced: boolean
   compact: boolean
@@ -275,20 +275,23 @@ function SlotCanvas({
   )
 }
 
-export default function StadiumExperience({ ballRef, pitchRef, reduced, compact }: StadiumExperienceProps) {
+export default function StadiumExperience({ ballRefs, pitchRef, reduced, compact }: StadiumExperienceProps) {
   const [hostsReady, setHostsReady] = useState(false)
   useEffect(() => setHostsReady(true), [])
-  const ballHost = ballRef.current
+  const ballHosts = ballRefs.current.filter((host): host is HTMLDivElement => host !== null)
   const pitchHost = pitchRef.current
-  if (!hostsReady || !ballHost || !pitchHost) return null
+  if (!hostsReady || ballHosts.length === 0 || !pitchHost) return null
 
   return (
     <>
-      {createPortal(
-        <SlotCanvas compact={compact} onReady={markStadiumReady}>
-          <BallScene reduced={reduced} compact={compact} />
-        </SlotCanvas>,
-        ballHost,
+      {ballHosts.map((host, index) =>
+        createPortal(
+          <SlotCanvas compact onReady={index === 0 ? markStadiumReady : undefined}>
+            <BallScene reduced={reduced} compact />
+          </SlotCanvas>,
+          host,
+          `corner-ball-${index}`,
+        ),
       )}
       {createPortal(
         <SlotCanvas compact={compact}>

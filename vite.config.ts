@@ -23,13 +23,13 @@ function pagesFallback(): Plugin {
       const css = names.find((name) => /^index-.*\.css$/.test(name))
       if (js) {
         fs.copyFileSync(path.join(assets, js), path.join(legacy, 'index-CyUzMM2u.js'))
-        for (const legacyName of ['index-BSCVoLQC.js', 'index-DTk6TEgC.js', 'index-C6lwwhIU.js', 'index-B3_Wx4lq.js', 'index-DY6EKBB7.js', 'index-DU7sgBGy.js']) {
+        for (const legacyName of ['index-BSCVoLQC.js', 'index-DTk6TEgC.js', 'index-C6lwwhIU.js', 'index-B3_Wx4lq.js', 'index-DY6EKBB7.js', 'index-DU7sgBGy.js', 'index-igq51qN5.js']) {
           if (js !== legacyName) fs.copyFileSync(path.join(assets, js), path.join(assets, legacyName))
         }
       }
       if (css) {
         fs.copyFileSync(path.join(assets, css), path.join(legacy, 'index-D85W7KUC.css'))
-        for (const legacyName of ['index-CpIg0DWG.css', 'index-BAgfaOav.css', 'index-Ba6TQZqx.css', 'index-DoQxhyYE.css']) {
+        for (const legacyName of ['index-CpIg0DWG.css', 'index-BAgfaOav.css', 'index-Ba6TQZqx.css', 'index-DoQxhyYE.css', 'index-CR_P6818.css']) {
           if (css !== legacyName) fs.copyFileSync(path.join(assets, css), path.join(assets, legacyName))
         }
       }

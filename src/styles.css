@@ -181,7 +181,7 @@ section[id] {
 .pitch-label,
 .edition,
 .score-strip,
-.art-labels,
+.award-note,
 .contract-label,
 .receipt-kicker {
   font-family: var(--display);
@@ -555,14 +555,39 @@ section[id] {
   }
 }
 
-.ball-slot {
+.corner-balls {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 46%;
-  height: 48%;
+  inset: 0;
   z-index: 2;
-  overflow: hidden;
+  pointer-events: none;
+}
+
+.corner-ball {
+  position: absolute;
+  width: clamp(70px, calc((100vw - 1240px) / 2 - 24px), 156px);
+  height: clamp(70px, calc((100vw - 1240px) / 2 - 24px), 156px);
+  pointer-events: auto;
+}
+
+.corner-ball-tl { top: 10px; left: 10px; }
+.corner-ball-tr { top: 10px; right: 10px; }
+.corner-ball-bl { bottom: 10px; left: 10px; }
+.corner-ball-br { bottom: 10px; right: 10px; }
+
+.award-note {
+  margin: 8px 0 2px;
+  color: var(--gold);
+}
+
+.award-note p {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.15;
+}
+
+.award-note .nums {
+  font-size: 1.35rem;
+  color: var(--white);
 }
 
 .trophy-still {
@@ -571,36 +596,41 @@ section[id] {
   object-fit: contain;
 }
 
+.hero-art {
+  overflow: visible;
+}
+
 .mascot {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  width: auto;
-  max-width: 78%;
+  inset: 0;
+  width: 100%;
   height: 100%;
   object-fit: contain;
   object-position: right bottom;
   z-index: 1;
+  pointer-events: none;
 }
 
-.art-labels {
-  position: absolute;
-  left: 0;
-  bottom: 8px;
-  z-index: 3;
-  margin: 0;
-  color: var(--gold);
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+@media (min-width: 1024px) {
+  .hero-art {
+    height: auto;
+    align-self: stretch;
+  }
 }
 
-.art-labels p {
-  margin: 0;
-  font-size: 0.95rem;
-}
+@media (max-width: 1023px) {
+  .mascot {
+    position: relative;
+    inset: auto;
+    height: auto;
+    width: min(100%, 380px);
+    margin-left: auto;
+  }
 
-.art-labels .nums {
-  font-size: 1.4rem;
-  color: var(--white);
+  .corner-ball {
+    width: 72px;
+    height: 72px;
+  }
 }
 
 .standings {

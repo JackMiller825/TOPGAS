@@ -53,7 +53,7 @@ export default function App() {
 }
 
 function PublicSite() {
-  const ballRef = useRef<HTMLDivElement>(null)
+  const ballRefs = useRef<Array<HTMLDivElement | null>>([null, null, null, null])
   const pitchRef = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
   const saveData = useSaveData()
@@ -71,7 +71,7 @@ function PublicSite() {
       </a>
       <Header />
       <main id="main">
-        <Hero ballRef={ballRef} show3d={show3d} saveData={saveData} reduced={reduced} />
+        <Hero ballRefs={ballRefs} show3d={show3d} saveData={saveData} reduced={reduced} />
         <Story pitchRef={pitchRef} show3d={show3d} reduced={reduced} />
         <Tokenomics reduced={reduced} />
         <HowToBuy reduced={reduced} />
@@ -81,7 +81,7 @@ function PublicSite() {
       {show3d && (
         <StadiumBoundary onFail={() => setWebglOk(false)}>
           <Suspense fallback={null}>
-            <StadiumExperience ballRef={ballRef} pitchRef={pitchRef} reduced={reduced} compact={compact} />
+            <StadiumExperience ballRefs={ballRefs} pitchRef={pitchRef} reduced={reduced} compact={compact} />
           </Suspense>
         </StadiumBoundary>
       )}

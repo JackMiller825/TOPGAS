@@ -7,14 +7,16 @@ import { trackCta } from '../analytics/tracker.ts'
 import { OfficialLink } from '../components/OfficialLink.tsx'
 import { Standings } from '../components/Standings.tsx'
 
+const CORNERS = ['tl', 'tr', 'bl', 'br'] as const
+
 type HeroProps = {
-  ballRef: RefObject<HTMLDivElement | null>
+  ballRefs: RefObject<Array<HTMLDivElement | null>>
   show3d: boolean
   saveData: boolean
   reduced: boolean
 }
 
-export function Hero({ ballRef, show3d, saveData, reduced }: HeroProps) {
+export function Hero({ ballRefs, show3d, saveData, reduced }: HeroProps) {
   const config = useTokenConfig()
   const [ready, setReady] = useState(false)
   const [spinNote, setSpinNote] = useState('')
@@ -51,6 +53,31 @@ export function Hero({ ballRef, show3d, saveData, reduced }: HeroProps) {
         eager
       />
       <div className="hero-scrim" />
+      <div className="corner-balls">
+        {CORNERS.map((corner, index) => (
+          <div
+            key={corner}
+            className={`corner-ball corner-ball-${corner}`}
+            ref={(node) => {
+              ballRefs.current[index] = node
+            }}
+            onPointerMove={onPointerMove}
+            onPointerLeave={() => setPointerTilt(0, 0)}
+          >
+            {!show3d && (
+              <ArtImage
+                filename="topgas-golden-trophy.png"
+                alt={index === 0 ? 'Golden football trophy on a pedestal' : ''}
+                width={800}
+                height={1000}
+                className="trophy-still"
+                eager
+              />
+            )}
+            {show3d && !ready && index === 0 && <p className="loading-stadium">Loading stadium…</p>}
+          </div>
+        ))}
+      </div>
       <div className="wrap hero-content">
         <div className="hero-grid">
           <div className="hero-copy">
@@ -67,6 +94,11 @@ export function Hero({ ballRef, show3d, saveData, reduced }: HeroProps) {
             </p>
             <p className="tagline">{config.tagline}</p>
             <p className="fine">A fictional football × Ethereum awards-night universe.</p>
+            <div className="award-note">
+              <p>The Golden Gas Award</p>
+              <p className="nums">20.26 ETH</p>
+              <p>Kane's signature gas bill</p>
+            </div>
             <div className="hero-actions">
               <a className="btn btn-gold" href="#story">
                 Enter the stadium ↘
@@ -106,24 +138,6 @@ export function Hero({ ballRef, show3d, saveData, reduced }: HeroProps) {
             )}
           </div>
           <div className="hero-art">
-            <div
-              ref={ballRef}
-              className="ball-slot"
-              onPointerMove={onPointerMove}
-              onPointerLeave={() => setPointerTilt(0, 0)}
-            >
-              {!show3d && (
-                <ArtImage
-                  filename="topgas-golden-trophy.png"
-                  alt="Golden football trophy on a pedestal"
-                  width={800}
-                  height={1000}
-                  className="trophy-still"
-                  eager
-                />
-              )}
-              {show3d && !ready && <p className="loading-stadium">Loading stadium…</p>}
-            </div>
             <ArtImage
               filename="topgas-mascot-trophy-receipt.png"
               alt="Harry Kane caricature in a white kit and royal cape, holding a golden football trophy and a 20.26 ETH gas receipt."
@@ -132,11 +146,6 @@ export function Hero({ ballRef, show3d, saveData, reduced }: HeroProps) {
               className="mascot"
               eager
             />
-            <div className="art-labels">
-              <p>The Golden Gas Award</p>
-              <p className="nums">20.26 ETH</p>
-              <p>Kane's signature gas bill</p>
-            </div>
           </div>
         </div>
         <Standings variant="strip" />
