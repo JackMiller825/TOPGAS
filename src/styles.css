@@ -507,6 +507,7 @@ section[id] {
   width: 46%;
   height: 48%;
   z-index: 2;
+  overflow: hidden;
 }
 
 .trophy-still {
@@ -620,6 +621,41 @@ section[id] {
   grid-area: total;
 }
 
+.standings-panel .standing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  padding: 10px 6px 8px;
+}
+
+.standings-panel .place,
+.standings-panel .who,
+.standings-panel .nums {
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.05;
+}
+
+.standings-panel .who {
+  font-size: clamp(0.72rem, 1.15vw, 0.95rem);
+  letter-spacing: 0;
+}
+
+.standings-panel .nums {
+  font-size: 0.78rem;
+  white-space: normal;
+}
+
+.standings-panel .bar {
+  width: 100%;
+  margin-top: auto;
+}
+
 .bar {
   grid-area: bar;
   display: block;
@@ -677,8 +713,8 @@ section[id] {
   }
 
   .footer-grid {
-    grid-template-columns: 1.2fr 1fr auto;
-    align-items: start;
+    grid-template-columns: 1fr auto;
+    align-items: center;
   }
 }
 
@@ -691,6 +727,8 @@ section[id] {
 
 .lineup {
   display: block;
+  position: relative;
+  z-index: 4;
   width: 100%;
   margin: 28px 0;
   object-fit: contain;
@@ -702,7 +740,9 @@ section[id] {
 }
 
 .pitch-slot {
+  position: relative;
   height: 280px;
+  overflow: hidden;
   border-radius: 18px;
   background: repeating-linear-gradient(90deg, var(--pitch) 0 28px, var(--pitch-alt) 28px 56px);
   box-shadow: inset 0 0 0 3px rgba(245, 241, 231, 0.8);
@@ -802,7 +842,7 @@ section[id] {
 
 @media (min-width: 1024px) {
   .scoreboard {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -826,6 +866,48 @@ section[id] {
   text-transform: uppercase;
   line-height: 1.05;
   overflow-wrap: anywhere;
+}
+
+.stat-facts {
+  margin-top: 14px;
+}
+
+.stat-facts dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .stat-facts dl {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-facts div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.stat-facts dt,
+.stat-facts dd {
+  margin: 0;
+}
+
+.stat-facts dt {
+  font-weight: 700;
+}
+
+.stat-facts dd {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.45rem;
+  line-height: 1;
+  color: var(--gold);
+  text-align: right;
 }
 
 .contract-strip {
@@ -1075,8 +1157,12 @@ section[id] {
 }
 
 .site-footer nav {
-  display: grid;
-  align-content: start;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+  grid-column: 1 / -1;
 }
 
 .site-footer nav a,

@@ -3,7 +3,6 @@ import { startPublicAnalytics } from './analytics/tracker.ts'
 import { isDashboardLocation } from './dashboard/path.ts'
 import { Header } from './components/Header.tsx'
 import { Footer } from './components/Footer.tsx'
-import { FAQ } from './components/FAQ.tsx'
 import { StadiumBoundary } from './components/StadiumBoundary.tsx'
 import { Hero } from './sections/Hero.tsx'
 import { Story } from './sections/Story.tsx'
@@ -77,7 +76,6 @@ function PublicSite() {
         <Tokenomics reduced={reduced} />
         <HowToBuy reduced={reduced} />
         <Community reduced={reduced} />
-        <FAQ />
       </main>
       <Footer />
       {show3d && (

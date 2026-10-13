@@ -4,7 +4,6 @@ export const navigation = [
   { id: 'tokenomics', href: '#tokenomics', label: 'Tokenomics' },
   { id: 'how-to-buy', href: '#how-to-buy', label: 'How to Buy' },
   { id: 'community', href: '#community', label: 'Community' },
-  { id: 'faq', href: '#faq', label: 'FAQ' },
 ] as const
 
 export type SectionId = (typeof navigation)[number]['id']

@@ -3,11 +3,6 @@
  *
  * Pending until a verified source is supplied:
  * - contractAddress
- * - totalSupply
- * - buyTax
- * - sellTax
- * - liquidityStatus
- * - ownershipStatus
  * - launchStatus
  * - links.buy, links.chart, links.x, links.telegram
  *
@@ -50,11 +45,11 @@ export const token: TokenConfig = {
   tagline: 'The Golden Ball for the Biggest Gas Bill.',
   secondaryHook: 'Forget goals. Show us your gas bill.',
   contractAddress: null,
-  totalSupply: null,
-  buyTax: null,
-  sellTax: null,
-  liquidityStatus: null,
-  ownershipStatus: null,
+  totalSupply: '1,000,000,000',
+  buyTax: '0%',
+  sellTax: '0%',
+  liquidityStatus: 'Burn',
+  ownershipStatus: 'Renounce',
   launchStatus: null,
   links: { buy: null, chart: null, x: null, telegram: null },
   siteUrl: 'https://topgas.online',

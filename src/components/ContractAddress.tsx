@@ -1,5 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
-import { confirmedAddress, formatFact, resolveToken, token } from '../config/token.ts'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { confirmedAddress, formatFact, resolveToken, token, type TokenConfig } from '../config/token.ts'
+
+const UNPUBLISHED_ADDRESS = 'Coming Soon..'
+
+function taxLabel(config: TokenConfig): string {
+  const buy = formatFact(config.buyTax)
+  const sell = formatFact(config.sellTax)
+  return buy === sell ? buy : `${buy} / ${sell}`
+}
 
 export function useTokenConfig() {
   return useMemo(() => resolveToken(token), [])
@@ -8,7 +16,9 @@ export function useTokenConfig() {
 export function ContractAddress() {
   const config = useTokenConfig()
   const address = confirmedAddress(config.contractAddress)
+  const displayAddress = address ?? UNPUBLISHED_ADDRESS
   const [state, setState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const resetTimer = useRef<number | null>(null)
 
   useEffect(() => {
     if (config.contractAddress != null && !address) {
@@ -17,27 +27,53 @@ export function ContractAddress() {
   }, [address, config.contractAddress])
 
   useEffect(() => {
-    if (state !== 'copied') return
-    const timer = window.setTimeout(() => setState('idle'), 2000)
-    return () => window.clearTimeout(timer)
-  }, [state])
+    return () => {
+      if (resetTimer.current != null) window.clearTimeout(resetTimer.current)
+    }
+  }, [])
+
+  function markCopied() {
+    setState('copied')
+    if (resetTimer.current != null) window.clearTimeout(resetTimer.current)
+    resetTimer.current = window.setTimeout(() => {
+      resetTimer.current = null
+      setState('idle')
+    }, 5000)
+  }
+
+  function copyWithSelection(text: string): boolean {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.top = '0'
+    area.style.left = '0'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.focus()
+    area.select()
+    const copied = document.execCommand('copy')
+    area.remove()
+    return copied
+  }
 
   async function copyAddress() {
-    if (!address) return
     try {
-      await navigator.clipboard.writeText(address)
-      setState('copied')
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(displayAddress)
+        markCopied()
+        return
+      }
+    } catch {
+      // The clipboard API can reject without a focused secure context. The selection fallback still copies.
+    }
+    try {
+      if (copyWithSelection(displayAddress)) markCopied()
+      else setState('error')
     } catch {
       setState('error')
     }
   }
-
-  const extras = [
-    config.buyTax != null ? `Buy tax ${formatFact(config.buyTax)}` : null,
-    config.sellTax != null ? `Sell tax ${formatFact(config.sellTax)}` : null,
-    config.ownershipStatus != null ? `Ownership ${formatFact(config.ownershipStatus)}` : null,
-    config.liquidityStatus != null ? `Liquidity ${formatFact(config.liquidityStatus)}` : null,
-  ].filter((item): item is string => Boolean(item))
 
   return (
     <div className="contract-block">
@@ -55,31 +91,32 @@ export function ContractAddress() {
         <article className="stat-card reveal">
           <h3>Total supply</h3>
           <p className="stat-value">{formatFact(config.totalSupply)}</p>
-          <p>Confirmed supply will replace this placeholder.</p>
-        </article>
-        <article className="stat-card reveal">
-          <h3>Tax / liquidity</h3>
-          <p className="stat-value">{extras.length ? extras.join(' · ') : '[TOKENOMICS]'}</p>
-          <p>Buy tax, sell tax, ownership, and liquidity appear only after confirmation.</p>
         </article>
       </div>
+      <article className="stat-card stat-facts reveal">
+        <dl>
+          <div>
+            <dt>Buy / Sell tax</dt>
+            <dd>{taxLabel(config)}</dd>
+          </div>
+          <div>
+            <dt>LP status</dt>
+            <dd>{formatFact(config.liquidityStatus)}</dd>
+          </div>
+          <div>
+            <dt>Ownership</dt>
+            <dd>{formatFact(config.ownershipStatus)}</dd>
+          </div>
+        </dl>
+      </article>
 
       <div className="contract-strip">
         <p className="contract-label">Contract address</p>
-        <p className="address">{address ?? '[CONTRACT_ADDRESS]'}</p>
-        {address ? (
-          <button type="button" className="btn btn-gold" onClick={copyAddress}>
-            {state === 'copied' ? 'Copied!' : state === 'error' ? 'Retry copy' : 'Copy address'}
-          </button>
-        ) : (
-          <button type="button" className="btn btn-gold" disabled>
-            Awaiting confirmation
-          </button>
-        )}
+        <p className="address">{displayAddress}</p>
+        <button type="button" className="btn btn-gold" onClick={() => void copyAddress()}>
+          {state === 'copied' ? 'Copied' : 'Copy Address'}
+        </button>
       </div>
-      <p className="pending-note">
-        Supply, taxes, liquidity, ownership, and official links require confirmation before launch.
-      </p>
       {config.launchStatus != null && <p className="pending-note">Launch status: {formatFact(config.launchStatus)}</p>}
       <p className="sr-only" role="status" aria-live="polite">
         {state === 'copied' ? 'Contract address copied.' : ''}

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
-import { Canvas, createPortal, useFrame, useThree, type RootState } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import { contenders, MAX_GAS_TOTAL, toHundredths } from '../config/standings.ts'
@@ -11,14 +12,6 @@ const BALL_POSITION: [number, number, number] = [0, 0.45, 4.35]
 const BALL_TARGET: [number, number, number] = [0, 0.02, 0]
 const PITCH_POSITION: [number, number, number] = [0, 6.6, 7.1]
 const PITCH_TARGET: [number, number, number] = [0, 0, -0.2]
-
-const viewActive = { ball: false, pitch: false }
-
-type TrackId = 'ball' | 'pitch'
-
-function isOffscreen(rect: DOMRect, canvasRect: DOMRect) {
-  return rect.bottom <= canvasRect.top || rect.top >= canvasRect.bottom || rect.right <= canvasRect.left || rect.left >= canvasRect.right
-}
 
 function LookCamera({
   position,
@@ -34,81 +27,6 @@ function LookCamera({
     ref.current?.lookAt(target[0], target[1], target[2])
   }, [target])
   return <PerspectiveCamera ref={ref} makeDefault fov={fov} position={position} />
-}
-
-function CameraBridge({ cameraRef }: { cameraRef: RefObject<THREE.PerspectiveCamera | null> }) {
-  const camera = useThree((state) => state.camera)
-  useEffect(() => {
-    if (camera instanceof THREE.PerspectiveCamera) cameraRef.current = camera
-  }, [camera, cameraRef])
-  return null
-}
-
-function TrackedView({
-  track,
-  priority,
-  id,
-  children,
-}: {
-  track: RefObject<HTMLDivElement | null>
-  priority: number
-  id: TrackId
-  children: ReactNode
-}) {
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-  const [scene] = useMemo(() => [new THREE.Scene()], [])
-
-  useFrame((state: RootState) => {
-    viewActive[id] = false
-    const element = track.current
-    const camera = cameraRef.current
-    if (!element || !camera || document.hidden) return
-    const rect = element.getBoundingClientRect()
-    const canvasRect = state.gl.domElement.getBoundingClientRect()
-    if (rect.width < 2 || rect.height < 2 || isOffscreen(rect, canvasRect)) return
-    const clipLeft = Math.max(rect.left, canvasRect.left)
-    const clipTop = Math.max(rect.top, canvasRect.top)
-    const clipRight = Math.min(rect.right, canvasRect.right)
-    const clipBottom = Math.min(rect.bottom, canvasRect.bottom)
-    const clipWidth = clipRight - clipLeft
-    const clipHeight = clipBottom - clipTop
-    if (clipWidth < 1 || clipHeight < 1) return
-    viewActive[id] = true
-
-    const aspect = rect.width / rect.height
-    if (Math.abs(camera.aspect - aspect) > 0.001) {
-      camera.aspect = aspect
-      camera.updateProjectionMatrix()
-    }
-
-    // Viewport stays aligned with the slot. Scissor is the visible part, so a
-    // partial slot cannot paint over the sections around it while scrolling.
-    const renderer = state.gl
-    renderer.setViewport(rect.left - canvasRect.left, canvasRect.bottom - rect.bottom, rect.width, rect.height)
-    renderer.setScissor(clipLeft - canvasRect.left, canvasRect.bottom - clipBottom, clipWidth, clipHeight)
-    renderer.setScissorTest(true)
-    renderer.clear(true, true)
-    renderer.render(scene, camera)
-    renderer.setScissorTest(false)
-  }, priority)
-
-  return createPortal(
-    <>
-      {children}
-      <CameraBridge cameraRef={cameraRef} />
-    </>,
-    scene,
-  )
-}
-
-function FullClear() {
-  useFrame(({ gl }) => {
-    if (document.hidden) return
-    gl.setScissorTest(false)
-    gl.setClearColor(0x000000, 0)
-    gl.clear(true, true)
-  }, 1)
-  return null
 }
 
 function PauseWhenHidden() {
@@ -191,7 +109,7 @@ function BallScene({ reduced, compact }: { reduced: boolean; compact: boolean })
   }, [reduced])
 
   useFrame((_, delta) => {
-    if (!viewActive.ball || document.hidden) return
+    if (document.hidden) return
     const spin = spinRef.current
     const tilt = tiltRef.current
     if (spin && !reduced) {
@@ -241,7 +159,7 @@ function PitchScene({ reduced, compact }: { reduced: boolean; compact: boolean }
   const max = toHundredths(MAX_GAS_TOTAL)
 
   useFrame((_, delta) => {
-    if (!viewActive.pitch || !bars.current) return
+    if (!bars.current || document.hidden) return
     bars.current.children.forEach((child, index) => {
       const contender = contenders[index]
       if (!contender || !(child instanceof THREE.Mesh)) return
@@ -332,28 +250,52 @@ type StadiumExperienceProps = {
   compact: boolean
 }
 
-export default function StadiumExperience({ ballRef, pitchRef, reduced, compact }: StadiumExperienceProps) {
+function SlotCanvas({
+  compact,
+  onReady,
+  children,
+}: {
+  compact: boolean
+  onReady?: () => void
+  children: ReactNode
+}) {
   return (
-    <div className="stadium-layer" aria-hidden="true">
-      <Canvas
-        dpr={compact ? [1, 1.5] : [1, 2]}
-        gl={{ alpha: true, antialias: !compact, powerPreference: 'high-performance' }}
-        style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
-        onCreated={({ gl }) => {
-          gl.setClearColor(0x000000, 0)
-          gl.autoClear = false
-          markStadiumReady()
-        }}
-      >
-        <PauseWhenHidden />
-        <FullClear />
-        <TrackedView track={ballRef} priority={2} id="ball">
+    <Canvas
+      dpr={compact ? [1, 1.5] : [1, 2]}
+      gl={{ alpha: true, antialias: !compact, powerPreference: 'high-performance' }}
+      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+      onCreated={({ gl }) => {
+        gl.setClearColor(0x000000, 0)
+        onReady?.()
+      }}
+    >
+      <PauseWhenHidden />
+      {children}
+    </Canvas>
+  )
+}
+
+export default function StadiumExperience({ ballRef, pitchRef, reduced, compact }: StadiumExperienceProps) {
+  const [hostsReady, setHostsReady] = useState(false)
+  useEffect(() => setHostsReady(true), [])
+  const ballHost = ballRef.current
+  const pitchHost = pitchRef.current
+  if (!hostsReady || !ballHost || !pitchHost) return null
+
+  return (
+    <>
+      {createPortal(
+        <SlotCanvas compact={compact} onReady={markStadiumReady}>
           <BallScene reduced={reduced} compact={compact} />
-        </TrackedView>
-        <TrackedView track={pitchRef} priority={3} id="pitch">
+        </SlotCanvas>,
+        ballHost,
+      )}
+      {createPortal(
+        <SlotCanvas compact={compact}>
           <PitchScene reduced={reduced} compact={compact} />
-        </TrackedView>
-      </Canvas>
-    </div>
+        </SlotCanvas>,
+        pitchHost,
+      )}
+    </>
   )
 }

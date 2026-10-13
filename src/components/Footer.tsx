@@ -20,13 +20,6 @@ export function Footer() {
           <p className="footer-name">Ballon Winner 2026</p>
           <p>{config.tagline}</p>
         </div>
-        <nav aria-label="Footer">
-          {navigation.map((item) => (
-            <a key={item.id} href={item.href}>
-              {item.label}
-            </a>
-          ))}
-        </nav>
         <div className="footer-social">
           {telegram && (
             <a href={telegram} target="_blank" rel="noopener noreferrer" onClick={() => trackCta('telegram')}>
@@ -42,15 +35,14 @@ export function Footer() {
             Back to kickoff ↑
           </a>
         </div>
+        <nav aria-label="Footer">
+          {navigation.map((item) => (
+            <a key={item.id} href={item.href}>
+              {item.label}
+            </a>
+          ))}
+        </nav>
       </div>
-      <p className="wrap footer-note">
-        Independent football parody. No player or award-organizer affiliation. Token trading involves risk; no returns
-        are promised.
-      </p>
-      <p className="wrap footer-note">
-        Estimated visitor counts use a first-party cookie while a tab is visible. If this host supplies an IP address,
-        it is encrypted and deleted after 30 days. Do Not Track and Global Privacy Control requests are not stored.
-      </p>
     </footer>
   )
 }
