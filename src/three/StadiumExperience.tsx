@@ -66,24 +66,26 @@ function TrackedView({
     const rect = element.getBoundingClientRect()
     const canvasRect = state.gl.domElement.getBoundingClientRect()
     if (rect.width < 2 || rect.height < 2 || isOffscreen(rect, canvasRect)) return
+    const clipLeft = Math.max(rect.left, canvasRect.left)
+    const clipTop = Math.max(rect.top, canvasRect.top)
+    const clipRight = Math.min(rect.right, canvasRect.right)
+    const clipBottom = Math.min(rect.bottom, canvasRect.bottom)
+    const clipWidth = clipRight - clipLeft
+    const clipHeight = clipBottom - clipTop
+    if (clipWidth < 1 || clipHeight < 1) return
     viewActive[id] = true
 
-    const pixelRatio = state.gl.getPixelRatio()
-    const left = rect.left - canvasRect.left
-    const bottom = canvasRect.bottom - rect.bottom
-    const x = Math.max(0, Math.floor(left * pixelRatio))
-    const y = Math.max(0, Math.floor(bottom * pixelRatio))
-    const width = Math.max(1, Math.floor(rect.width * pixelRatio))
-    const height = Math.max(1, Math.floor(rect.height * pixelRatio))
     const aspect = rect.width / rect.height
     if (Math.abs(camera.aspect - aspect) > 0.001) {
       camera.aspect = aspect
       camera.updateProjectionMatrix()
     }
 
+    // Viewport stays aligned with the slot. Scissor is the visible part, so a
+    // partial slot cannot paint over the sections around it while scrolling.
     const renderer = state.gl
-    renderer.setViewport(x, y, width, height)
-    renderer.setScissor(x, y, width, height)
+    renderer.setViewport(rect.left - canvasRect.left, canvasRect.bottom - rect.bottom, rect.width, rect.height)
+    renderer.setScissor(clipLeft - canvasRect.left, canvasRect.bottom - clipBottom, clipWidth, clipHeight)
     renderer.setScissorTest(true)
     renderer.clear(true, true)
     renderer.render(scene, camera)
