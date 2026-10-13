@@ -1,0 +1,160 @@
+{
+  "name": "Ballon Winner 2026",
+  "ticker": "$TOPGAS",
+  "assets": [
+    {
+      "filename": "topgas-banner-1100x520.png",
+      "dimensions": [
+        1100,
+        520
+      ],
+      "transparent_background": false,
+      "sha256": "eb4b50f7a96714a3f8b3d89b6938a192045f84a1446df0403f7cbb45e21af843",
+      "generation_prompt": "Reused approved brand asset",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-banner-3to1.png",
+      "dimensions": [
+        1500,
+        500
+      ],
+      "transparent_background": false,
+      "sha256": "29062261f3bd759853dd7d16fd16f203a24174065735006b7542b4dabf9a0c8d",
+      "generation_prompt": "Reused approved brand asset",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-community-celebration.png",
+      "dimensions": [
+        1600,
+        1000
+      ],
+      "transparent_background": true,
+      "sha256": "17b00e5e7744a15f88b859572337b65302404fa5ec0dbe83e1f27b66c45498fd",
+      "generation_prompt": "Wide cutout illustration of the same five football caricatures celebrating together, Kane holding gold Ethereum football trophy, cheering hands and few gold confetti pieces, warm funny expressions. No text, no receipts, no background. Intended 1600x1000.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-contenders-lineup.png",
+      "dimensions": [
+        2000,
+        900
+      ],
+      "transparent_background": true,
+      "sha256": "120a8b17e082890dd05b7d10868b87d539d904be4af6301e48c9c75e90b19fcf",
+      "generation_prompt": "Wide cutout illustration of all five football caricatures with their receipts and small gold podiums, Kane central first 20.26 ETH, Ronaldo second 12.34 ETH, Messi third 6.78 ETH, Mbappe fourth 2.45 ETH, Haaland fifth 0.89 ETH. No background, branding or headline. Intended 2000x900.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-golden-trophy.png",
+      "dimensions": [
+        800,
+        1000
+      ],
+      "transparent_background": true,
+      "sha256": "dd150ab8b53fd2257b4fffa309dd8c97466a4421aa0f82c2ed54b955a052c389",
+      "generation_prompt": "Single isolated golden football trophy on elegant pedestal, Ethereum diamond embossed front, glossy rich gold, polished sculpted seams, dramatic gold-purple rim lighting. No characters, words or background. Intended 800x1000.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-haaland-portrait.png",
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_background": true,
+      "sha256": "84422191b9c18a6495a87b1bce8707e7f30fbbff435da93953cbf659d1782d4b",
+      "generation_prompt": "Square bust portrait cutout of haaland matching the corresponding character in reference, expressive friendly football caricature, recognizable face and kit, no receipt no trophy no text. Entire head shoulders unclipped. Intended 512x512.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-kane-portrait.png",
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_background": true,
+      "sha256": "0ba2cd3b92884666f582c2a6bfa3c9f96b3180b1bff68d8e814c6514296fe829",
+      "generation_prompt": "Square bust portrait cutout of kane matching the corresponding character in reference, expressive friendly football caricature, recognizable face and kit, no receipt no trophy no text. Entire head shoulders unclipped. Intended 512x512.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-logo-transparent.png",
+      "dimensions": [
+        1024,
+        1024
+      ],
+      "transparent_background": true,
+      "sha256": "9ab4ddaac3237b43f349804a35ff677fa25689df998f37aa8dec9b6ed9251cfe",
+      "generation_prompt": "Reused approved brand asset",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-mascot-trophy-receipt.png",
+      "dimensions": [
+        1600,
+        1800
+      ],
+      "transparent_background": true,
+      "sha256": "ad57dd92a05b3b266b41cecce0f223790c0ec199b03fb38821d41225a9684089",
+      "generation_prompt": "Portrait full-body cutout of the CENTRAL Harry Kane parody character alone, royal cape, white kit, cheerful face, golden Ethereum football trophy and prominent receipt. Receipt exact text GAS FEES, Swap 12.00 ETH, Mint 8.00 ETH, Transfer 0.26 ETH, TOTAL 20.26 ETH. No podium, no branding or background. Entire character unclipped. Intended 1600x1800.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-mbappe-portrait.png",
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_background": true,
+      "sha256": "50144e52ef56d50697ea013f648573fe61cbf0c52842cb9884c32eb40fd0fa1d",
+      "generation_prompt": "Square bust portrait cutout of mbappe matching the corresponding character in reference, expressive friendly football caricature, recognizable face and kit, no receipt no trophy no text. Entire head shoulders unclipped. Intended 512x512.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-messi-portrait.png",
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_background": true,
+      "sha256": "42819be2e3db8e8f29d149a31eb8f002235d8c925d9f950f389fab9c5953e1ea",
+      "generation_prompt": "Square bust portrait cutout of messi matching the corresponding character in reference, expressive friendly football caricature, recognizable face and kit, no receipt no trophy no text. Entire head shoulders unclipped. Intended 512x512.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-ronaldo-portrait.png",
+      "dimensions": [
+        512,
+        512
+      ],
+      "transparent_background": true,
+      "sha256": "a9a5edd531ba239ef90180fae7c0ce1d3d3314ada6953eed6472bb748e211a57",
+      "generation_prompt": "Square bust portrait cutout of ronaldo matching the corresponding character in reference, expressive friendly football caricature, recognizable face and kit, no receipt no trophy no text. Entire head shoulders unclipped. Intended 512x512.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-social-preview.png",
+      "dimensions": [
+        1200,
+        630
+      ],
+      "transparent_background": false,
+      "sha256": "90e4796f6df7e3556ed0e982f1b05f1c2ee0a5c9733937140a88d8944902c7af",
+      "generation_prompt": "Wide 1200x630 social sharing composition. Kane trophy and receipt 20.26 ETH on right, purple gold stadium, clearly readable exact typography left: Ballon Winner 2026, $TOPGAS, The Golden Ball for the Biggest Gas Bill. Strong safe margins, no additional text.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    },
+    {
+      "filename": "topgas-stadium-background.webp",
+      "dimensions": [
+        2400,
+        1350
+      ],
+      "transparent_background": false,
+      "sha256": "3d3c46545a45f3432b493216fe50c80c257acddc92603bcd41525d8bdeacbf6a",
+      "generation_prompt": "Wide 16:9 atmospheric stadium at night, purple stands and emerald football pitch, warm gold floodlights, dramatic depth, clean spacious center for overlaying 3D ball and website text. NO players, trophies, lettering, logos, receipts or confetti. Intended 2400x1350.",
+      "postprocessing": "Aspect-preserving resize and transparent padding, or opaque aspect-ratio crop. Portrait background corrections used imagegen."
+    }
+  ]
+}
