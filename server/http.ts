@@ -8,7 +8,7 @@ const PRIVATE_HEADERS = {
   'cache-control': 'private, no-store',
   'cdn-cache-control': 'no-store',
   pragma: 'no-cache',
-  vary: 'Cookie',
+  vary: 'Cookie, Origin',
   'x-content-type-options': 'nosniff',
   'x-robots-tag': 'noindex, nofollow',
   'referrer-policy': 'no-referrer',
@@ -53,16 +53,24 @@ export function readCookies(header: string | string[] | undefined): Map<string, 
   return map
 }
 
-export function cookieHeader(name: string, value: string, options: { maxAge: number; httpOnly: boolean; secure: boolean; sameSite: 'Strict' | 'Lax' }): string {
+export type CookieSite = 'Strict' | 'Lax' | 'None'
+
+export function cookieHeader(
+  name: string,
+  value: string,
+  options: { maxAge: number; httpOnly: boolean; secure: boolean; sameSite: CookieSite; partitioned?: boolean },
+): string {
   const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', `Max-Age=${options.maxAge}`, `SameSite=${options.sameSite}`]
   if (options.httpOnly) parts.push('HttpOnly')
   if (options.secure) parts.push('Secure')
+  if (options.partitioned) parts.push('Partitioned')
   return parts.join('; ')
 }
 
-export function clearCookie(name: string, secure: boolean): string {
-  const parts = [`${name}=`, 'Path=/', 'Max-Age=0', 'SameSite=Strict', 'HttpOnly']
-  if (secure) parts.push('Secure')
+export function clearCookie(name: string, options: { secure: boolean; sameSite: CookieSite; partitioned?: boolean }): string {
+  const parts = [`${name}=`, 'Path=/', 'Max-Age=0', `SameSite=${options.sameSite}`, 'HttpOnly']
+  if (options.secure) parts.push('Secure')
+  if (options.partitioned) parts.push('Partitioned')
   return parts.join('; ')
 }
 
@@ -83,7 +91,7 @@ export async function readJson(req: IncomingMessage, limit = 8192): Promise<unkn
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
 }
 
-export function originAllowed(req: IncomingMessage): boolean {
+export function originAllowed(req: IncomingMessage, allowedOrigins: string[] = []): boolean {
   const origin = headerValue(req.headers.origin)
   const host = headerValue(req.headers.host)
   if (!origin) {
@@ -92,10 +100,22 @@ export function originAllowed(req: IncomingMessage): boolean {
     return true
   }
   try {
-    return new URL(origin).host === host
+    if (new URL(origin).host === host) return true
+    return allowedOrigins.includes(origin)
   } catch {
     return false
   }
+}
+
+export function applyCors(req: IncomingMessage, res: ServerResponse, allowedOrigins: string[]): void {
+  const origin = headerValue(req.headers.origin)
+  if (!origin || !allowedOrigins.includes(origin)) return
+  res.setHeader('access-control-allow-origin', origin)
+  res.setHeader('access-control-allow-credentials', 'true')
+  res.setHeader('access-control-allow-headers', 'accept, content-type, x-csrf-token')
+  res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS')
+  res.setHeader('access-control-max-age', '600')
+  res.setHeader('vary', 'Cookie, Origin')
 }
 
 export function headerValue(value: string | string[] | undefined): string {

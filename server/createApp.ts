@@ -5,11 +5,13 @@ import {
   CSRF_COOKIE,
   SESSION_COOKIE,
   VISITOR_COOKIE,
+  applyCors,
   clearCookie,
   clientRefused,
   cookieHeader,
   headerValue,
   originAllowed,
+  type CookieSite,
   readCookies,
   readJson,
   requestIsHttps,
@@ -47,6 +49,7 @@ export type AppOptions = {
   delaySchedule?: number[]
   classifyLocalHost?: boolean
   treatNonProductionAsDevelopment?: boolean
+  allowedOrigins?: string[]
 }
 
 export type App = {
@@ -73,6 +76,7 @@ export function createApp(options: AppOptions): App {
   const classifyLocalHost = options.classifyLocalHost ?? nodeEnv === 'production'
   const treatNonProductionAsDevelopment =
     options.treatNonProductionAsDevelopment ?? (nodeEnv !== 'production' && nodeEnv !== 'test')
+  const allowedOrigins = options.allowedOrigins ?? []
   const bootstrap = options.bootstrapPassword ?? process.env.DASHBOARD_PASSWORD
   if (!db.hasPassword() && bootstrap) db.setPasswordHash(hashPassword(bootstrap), now())
 
@@ -86,7 +90,23 @@ export function createApp(options: AppOptions): App {
     const url = new URL(req.url ?? '/', 'http://localhost')
     const pathname = url.pathname
     try {
-      if (req.method === 'POST' && !originAllowed(req)) {
+      applyCors(req, res, allowedOrigins)
+      if (req.method === 'OPTIONS' && pathname.startsWith('/api/')) {
+        if (!originAllowed(req, allowedOrigins)) {
+          sendJson(res, 403, { ok: false })
+          return
+        }
+        res.statusCode = 204
+        for (const [name, value] of Object.entries({
+          'cache-control': 'private, no-store',
+          'x-content-type-options': 'nosniff',
+        })) {
+          res.setHeader(name, value)
+        }
+        res.end()
+        return
+      }
+      if (req.method === 'POST' && !originAllowed(req, allowedOrigins)) {
         sendJson(res, 403, { ok: false })
         return
       }
@@ -142,16 +162,30 @@ export function createApp(options: AppOptions): App {
     return requestIsHttps(req, trustedPeer)
   }
 
+  function cookieFlags(req: IncomingMessage, sameSite: CookieSite): { secure: boolean; sameSite: CookieSite; partitioned: boolean } {
+    const origin = headerValue(req.headers.origin)
+    let crossSite = false
+    if (origin) {
+      try {
+        crossSite = new URL(origin).host !== headerValue(req.headers.host)
+      } catch {
+        crossSite = false
+      }
+    }
+    if (crossSite) return { secure: true, sameSite: 'None', partitioned: true }
+    return { secure: secure(req), sameSite, partitioned: false }
+  }
+
   function csrfCookie(token: string, req: IncomingMessage): string {
-    return cookieHeader(CSRF_COOKIE, token, { maxAge: SESSION_MS / 1000, httpOnly: true, secure: secure(req), sameSite: 'Strict' })
+    return cookieHeader(CSRF_COOKIE, token, { maxAge: SESSION_MS / 1000, httpOnly: true, ...cookieFlags(req, 'Strict') })
   }
 
   function sessionCookie(token: string, req: IncomingMessage): string {
-    return cookieHeader(SESSION_COOKIE, token, { maxAge: SESSION_MS / 1000, httpOnly: true, secure: secure(req), sameSite: 'Strict' })
+    return cookieHeader(SESSION_COOKIE, token, { maxAge: SESSION_MS / 1000, httpOnly: true, ...cookieFlags(req, 'Strict') })
   }
 
   function visitorCookie(token: string, req: IncomingMessage): string {
-    return cookieHeader(VISITOR_COOKIE, token, { maxAge: 400 * 24 * 60 * 60, httpOnly: true, secure: secure(req), sameSite: 'Lax' })
+    return cookieHeader(VISITOR_COOKIE, token, { maxAge: 400 * 24 * 60 * 60, httpOnly: true, ...cookieFlags(req, 'Lax') })
   }
 
   function currentSession(req: IncomingMessage): { hash: string } | null {
@@ -203,7 +237,17 @@ export function createApp(options: AppOptions): App {
     }
     const body = asObject(await readJson(req))
     const password = typeof body.password === 'string' ? body.password : ''
-    const subject = hashToken(secrets.pepper, `${normalizeIp(req.socket.remoteAddress) ?? 'unavailable'}|${headerValue(req.headers['user-agent'])}`)
+    const visitorIp =
+      resolveVisitorIp({
+        remoteAddress: req.socket.remoteAddress,
+        headers: req.headers,
+        trustProxy,
+        trustedProxies,
+        trustedIpHeader,
+      }) ??
+      normalizeIp(req.socket.remoteAddress) ??
+      'unavailable'
+    const subject = hashToken(secrets.pepper, `${visitorIp}|${headerValue(req.headers['user-agent'])}`)
     const failures = db.countFailures(subject, now() - ATTEMPT_WINDOW_MS)
     if (failures >= maxFailures) {
       sendJson(res, 429, { error: 'Too many attempts. Please try again later.' })
@@ -232,7 +276,8 @@ export function createApp(options: AppOptions): App {
     if (!requireCsrf(req, res)) return
     const token = readCookies(req.headers.cookie).get(SESSION_COOKIE)
     if (token) db.deleteSession(hashToken(secrets.pepper, token))
-    sendJson(res, 200, { ok: true }, [clearCookie(SESSION_COOKIE, secure(req)), clearCookie(CSRF_COOKIE, secure(req))])
+    const flags = cookieFlags(req, 'Strict')
+    sendJson(res, 200, { ok: true }, [clearCookie(SESSION_COOKIE, flags), clearCookie(CSRF_COOKIE, flags)])
   }
 
   async function changePassword(req: IncomingMessage, res: ServerResponse) {
@@ -261,9 +306,10 @@ export function createApp(options: AppOptions): App {
     }
     db.setPasswordHash(hashPassword(next), now())
     db.deleteAllSessions()
+    const flags = cookieFlags(req, 'Strict')
     sendJson(res, 200, { ok: true, message: 'Password changed. Sign in with the new password.' }, [
-      clearCookie(SESSION_COOKIE, secure(req)),
-      clearCookie(CSRF_COOKIE, secure(req)),
+      clearCookie(SESSION_COOKIE, flags),
+      clearCookie(CSRF_COOKIE, flags),
     ])
   }
 

@@ -461,6 +461,35 @@ test('filters, pagination, deletion, retention, bots, and refusals', async () =>
   }
 })
 
+test('the public site origin can call the API with a partitioned cookie', async () => {
+  const session = await start({ allowedOrigins: ['https://topgas.online'] })
+  try {
+    const first = await session.request('/api/dashboard/session', { headers: { origin: 'https://topgas.online' } })
+    assert.equal(first.status, 200)
+    assert.equal(first.headers.get('access-control-allow-origin'), 'https://topgas.online')
+    assert.equal(first.headers.get('access-control-allow-credentials'), 'true')
+    const setCookie = first.headers.get('set-cookie') ?? ''
+    assert.match(setCookie, /SameSite=None/)
+    assert.match(setCookie, /Partitioned/)
+    assert.match(setCookie, /Secure/)
+    const token = String(first.data.csrfToken)
+    const loggedIn = await session.request('/api/dashboard/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: 'https://topgas.online', 'x-csrf-token': token },
+      body: JSON.stringify({ password: PASSWORD }),
+    })
+    assert.equal(loggedIn.status, 200)
+    const preflight = await session.request('/api/dashboard/login', {
+      method: 'OPTIONS',
+      headers: { origin: 'https://topgas.online', 'access-control-request-method': 'POST' },
+    })
+    assert.equal(preflight.status, 204)
+    assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://topgas.online')
+  } finally {
+    await session.stop()
+  }
+})
+
 test('localhost production traffic is development and excluded by default', async () => {
   const session = await start({ nodeEnv: 'production' })
   try {

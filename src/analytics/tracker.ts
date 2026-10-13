@@ -1,3 +1,4 @@
+import { apiOrigin, apiUrl } from '../dashboard/origin.ts'
 import { isDashboardLocation } from '../dashboard/path.ts'
 
 type CollectType = 'pageview' | 'heartbeat' | 'section' | 'click'
@@ -24,11 +25,11 @@ function utmFields(): { utmSource?: string; utmMedium?: string; utmCampaign?: st
 
 async function post(route: '/api/analytics/collect' | '/api/analytics/heartbeat', body: Record<string, unknown>): Promise<boolean> {
   try {
-    const response = await fetch(route, {
+    const response = await fetch(apiUrl(route), {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify(body),
-      credentials: 'same-origin',
+      credentials: apiOrigin() ? 'include' : 'same-origin',
       cache: 'no-store',
       keepalive: true,
     })

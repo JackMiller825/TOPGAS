@@ -12,6 +12,10 @@ const trustedProxies = (process.env.TRUSTED_PROXIES ?? '')
   .split(',')
   .map((item) => item.trim())
   .filter(Boolean)
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'https://topgas.online,https://www.topgas.online')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean)
 
 const app = createApp({
   dataDir,
@@ -19,6 +23,7 @@ const app = createApp({
   trustProxy,
   trustedProxies,
   trustedIpHeader: process.env.TRUSTED_IP_HEADER ?? 'cf-connecting-ip',
+  allowedOrigins,
 })
 
 const server = createServer((req, res) => {

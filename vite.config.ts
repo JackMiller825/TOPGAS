@@ -10,6 +10,27 @@ function pagesFallback(): Plugin {
     closeBundle() {
       const index = path.resolve('dist/index.html')
       if (fs.existsSync(index)) fs.copyFileSync(index, path.resolve('dist/404.html'))
+      // Browsers that cached the previous /TOPGAS/ HTML still request these exact files.
+      const assets = path.resolve('dist/assets')
+      if (!fs.existsSync(assets)) return
+      const legacy = path.resolve('dist/TOPGAS/assets')
+      fs.mkdirSync(legacy, { recursive: true })
+      const names = fs.readdirSync(assets)
+      for (const name of names) {
+        if (name.endsWith('.js')) fs.copyFileSync(path.join(assets, name), path.join(legacy, name))
+      }
+      const js = names.find((name) => /^index-.*\.js$/.test(name))
+      const css = names.find((name) => /^index-.*\.css$/.test(name))
+      if (js) {
+        fs.copyFileSync(path.join(assets, js), path.join(legacy, 'index-CyUzMM2u.js'))
+        if (js !== 'index-BSCVoLQC.js') fs.copyFileSync(path.join(assets, js), path.join(assets, 'index-BSCVoLQC.js'))
+      }
+      if (css) {
+        fs.copyFileSync(path.join(assets, css), path.join(legacy, 'index-D85W7KUC.css'))
+        if (css !== 'index-CpIg0DWG.css') fs.copyFileSync(path.join(assets, css), path.join(assets, 'index-CpIg0DWG.css'))
+      }
+      const images = path.join(assets, 'topgas')
+      if (fs.existsSync(images)) fs.cpSync(images, path.join(legacy, 'topgas'), { recursive: true })
     },
   }
 }

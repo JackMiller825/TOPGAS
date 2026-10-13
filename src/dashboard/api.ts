@@ -1,3 +1,5 @@
+import { apiOrigin, apiUrl } from './origin.ts'
+
 export type ApiResult<T> = { ok: boolean; status: number; data: T }
 
 export async function api<T>(path: string, init: { method?: string; body?: unknown; csrf?: string } = {}): Promise<ApiResult<T>> {
@@ -5,11 +7,11 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   if (init.body !== undefined) headers.set('content-type', 'application/json')
   if (init.csrf) headers.set('x-csrf-token', init.csrf)
   try {
-    const response = await fetch(path, {
+    const response = await fetch(apiUrl(path), {
       method: init.method ?? 'GET',
       headers,
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-      credentials: 'same-origin',
+      credentials: apiOrigin() ? 'include' : 'same-origin',
       cache: 'no-store',
     })
     const text = await response.text()

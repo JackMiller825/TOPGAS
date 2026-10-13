@@ -34,7 +34,7 @@ Dev server path: `http://localhost:5173/`. Add `?fixture=confirmed` in developme
 
 ## Visitor dashboard
 
-GitHub Pages only serves the static site. It cannot check a password, keep a session, or store visitor records. The public Pages site stays at the URL above. The password dashboard runs only when this Node server is the host.
+GitHub Pages serves the static site. The password check and visitor records run in this Node server. On https://topgas.online the page calls that server at `https://topgas.103.161.35.238.sslip.io`. The dashboard on the public site works only while that process is running and can be reached on ports 80 and 443. Local use stays on the same origin.
 
 The server needs Node 24. One-time setup reads `DASHBOARD_PASSWORD` from the environment, stores a hash in `data/analytics.sqlite`, and writes generated session and encryption keys to `data/secrets.json`. Those files are not committed. Setup does not replace a password that is already stored.
 
