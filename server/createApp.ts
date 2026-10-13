@@ -18,6 +18,7 @@ import {
   sendJson,
   sendText,
 } from './http.ts'
+import { lookupPlace, type Place } from './geo.ts'
 import { normalizeIp, resolveVisitorIp } from './ip.ts'
 import { hashPassword, hashToken, newToken, safeEqual, verifyPassword } from './passwords.ts'
 import { ensureSecrets } from './secrets.ts'
@@ -50,6 +51,7 @@ export type AppOptions = {
   classifyLocalHost?: boolean
   treatNonProductionAsDevelopment?: boolean
   allowedOrigins?: string[]
+  locate?: (ip: string) => Promise<Place | null>
 }
 
 export type App = {
@@ -63,7 +65,7 @@ type ObjectBody = Record<string, unknown>
 
 export function createApp(options: AppOptions): App {
   const secrets = ensureSecrets(options.dataDir)
-  const db = new AnalyticsDb(options.dataDir, secrets.ipKey)
+  const db = new AnalyticsDb(options.dataDir, secrets.ipKey, options.locate ?? lookupPlace)
   const now = options.now ?? (() => Date.now())
   const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)))
   const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? 'development'
@@ -406,7 +408,7 @@ export function createApp(options: AppOptions): App {
       }
       const page = clampInt(url.searchParams.get('page'), 1, 100000)
       const pageSize = clampInt(url.searchParams.get('pageSize'), 25, 100)
-      const listed = db.listVisits(filters, page, pageSize)
+      const listed = await db.listVisits(filters, page, pageSize)
       sendJson(res, 200, { page, pageSize, total: listed.total, visits: listed.visits, timezone: 'America/New_York' })
       return
     }
@@ -418,13 +420,14 @@ export function createApp(options: AppOptions): App {
         return
       }
       const reveal = url.searchParams.get('reveal') === '1'
-      const rows = db.exportVisits(filters, reveal, 5000)
+      const rows = await db.exportVisits(filters, reveal, 5000)
       const csv = toCsv([
-        ['visit_id', 'visitor_id', 'ip', 'started_at', 'last_seen', 'path', 'section', 'browser', 'os', 'device', 'referrer', 'utm_source', 'utm_medium', 'utm_campaign', 'classification'],
+        ['visit_id', 'visitor_id', 'ip', 'location', 'started_at', 'last_seen', 'path', 'section', 'browser', 'os', 'device', 'referrer', 'utm_source', 'utm_medium', 'utm_campaign', 'classification'],
         ...rows.map((row) => [
           row.id,
           row.visitorId,
           row.ip,
+          row.location,
           formatNy(row.startedAt),
           formatNy(row.lastSeen),
           row.path,
@@ -446,7 +449,7 @@ export function createApp(options: AppOptions): App {
     }
     const detail = /^\/api\/dashboard\/analytics\/visits\/([^/]+)$/.exec(pathname)
     if (req.method === 'GET' && detail) {
-      const visit = db.getVisit(detail[1], url.searchParams.get('reveal') === '1')
+      const visit = await db.getVisit(detail[1], url.searchParams.get('reveal') === '1')
       if (!visit) {
         sendJson(res, 404, { error: 'Visit not found.' })
         return

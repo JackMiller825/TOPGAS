@@ -1,8 +1,9 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
-import { decryptIp, encryptIp, maskIp } from './ip.ts'
-import { formatNy, nyParts, zonedTimeToUtc, type Range } from './time.ts'
+import { formatPlace, type Place } from './geo.ts'
+import { decryptIp, encryptIp, isPublicIp, maskIp } from './ip.ts'
+import { nyParts, zonedTimeToUtc, type Range } from './time.ts'
 
 type Sql = string | number | bigint | null
 
@@ -43,6 +44,7 @@ export type StoredVisit = {
   classification: string
   ip: string
   ipAvailable: boolean
+  location: string
 }
 
 export type Filters = {
@@ -130,12 +132,16 @@ function uniqueError(error: unknown): boolean {
   return error instanceof Error && /UNIQUE/i.test(error.message)
 }
 
+const LOCATION_TTL_MS = 12 * 60 * 60 * 1000
+
 export class AnalyticsDb {
   readonly db: DatabaseSync
   private readonly ipKey: Buffer
+  private readonly locate: (ip: string) => Promise<Place | null>
 
-  constructor(dataDir: string, ipKey: Buffer) {
+  constructor(dataDir: string, ipKey: Buffer, locate: (ip: string) => Promise<Place | null> = async () => null) {
     this.ipKey = ipKey
+    this.locate = locate
     this.db = new DatabaseSync(path.join(dataDir, 'analytics.sqlite'))
     this.db.exec('PRAGMA foreign_keys = ON')
     this.db.exec('PRAGMA busy_timeout = 3000')
@@ -147,12 +153,29 @@ export class AnalyticsDb {
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
     )`)
-    const existing = this.db.prepare('SELECT id FROM schema_migrations WHERE id = ?').get('001_init')
+    this.apply(
+      '001_init',
+      SCHEMA,
+    )
+    this.apply(
+      '002_locations',
+      `CREATE TABLE IF NOT EXISTS ip_locations (
+        ip_hash TEXT PRIMARY KEY,
+        country TEXT NOT NULL,
+        region TEXT NOT NULL,
+        city TEXT NOT NULL,
+        looked_up_at INTEGER NOT NULL
+      )`,
+    )
+  }
+
+  private apply(id: string, sql: string) {
+    const existing = this.db.prepare('SELECT id FROM schema_migrations WHERE id = ?').get(id)
     if (existing) return
     this.db.exec('BEGIN')
     try {
-      this.db.exec(SCHEMA)
-      this.db.prepare('INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)').run('001_init', Date.now())
+      this.db.exec(sql)
+      this.db.prepare('INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)').run(id, Date.now())
       this.db.exec('COMMIT')
     } catch (error) {
       this.db.exec('ROLLBACK')
@@ -386,11 +409,14 @@ export class AnalyticsDb {
     }
     const active = this.db
       .prepare(
-        `SELECT COUNT(DISTINCT h.visitor_id) AS n FROM heartbeats h JOIN visits v ON v.id = h.visit_id
-         WHERE h.created_at >= ? AND v.classification IN (${classPlaceholders})`,
+        `SELECT COUNT(DISTINCT h.visitor_id) AS n FROM heartbeats h
+         WHERE h.created_at >= ?
+         AND h.visitor_id IN (SELECT visitor_id FROM visits WHERE classification IN (${classPlaceholders}))`,
       )
       .get(activeSince, ...classArgs) as { n: number }
-    const started = this.db.prepare(`SELECT started_at FROM visits WHERE ${where.sql}`).all(...where.args) as { started_at: number }[]
+    const started = this.db
+      .prepare(`SELECT visitor_id, started_at FROM visits WHERE ${where.sql}`)
+      .all(...where.args) as { visitor_id: string; started_at: number }[]
     const referrals = this.db
       .prepare(
         `SELECT COALESCE(referrer_host, '') AS host, COUNT(*) AS n FROM visits WHERE ${where.sql}
@@ -410,7 +436,11 @@ export class AnalyticsDb {
       visits: Number(visits.n),
       pageViews: Number(views.n),
       clicks,
-      trend: bucketTrend(started.map((row) => row.started_at), filters.range),
+      trend: bucketTrend(
+        started.map((row) => ({ visitorId: row.visitor_id, at: row.started_at })),
+        filters.range,
+      ),
+      trendUnit: filters.range.unit,
       referrals: referrals.map((row) => ({ host: row.host || '(direct)', visits: Number(row.n) })),
       campaigns: campaigns.map((row) => ({
         source: row.source,
@@ -421,18 +451,20 @@ export class AnalyticsDb {
     }
   }
 
-  listVisits(filters: Filters, page: number, pageSize: number) {
+  async listVisits(filters: Filters, page: number, pageSize: number) {
     const where = this.where(filters)
     const total = this.db.prepare(`SELECT COUNT(*) AS n FROM visits WHERE ${where.sql}`).get(...where.args) as { n: number }
     const rows = this.db
       .prepare(`SELECT * FROM visits WHERE ${where.sql} ORDER BY started_at DESC LIMIT ? OFFSET ?`)
       .all(...where.args, pageSize, (page - 1) * pageSize) as VisitRow[]
-    return { total: Number(total.n), visits: rows.map((row) => this.present(row, false)) }
+    const places = await this.placesFor(rows)
+    return { total: Number(total.n), visits: rows.map((row) => this.present(row, false, places)) }
   }
 
-  getVisit(id: string, reveal: boolean): (StoredVisit & { pageViews: { path: string; createdAt: number }[]; clicks: { kind: string; createdAt: number }[] }) | null {
+  async getVisit(id: string, reveal: boolean): Promise<(StoredVisit & { pageViews: { path: string; createdAt: number }[]; clicks: { kind: string; createdAt: number }[] }) | null> {
     const row = this.db.prepare('SELECT * FROM visits WHERE id = ?').get(id) as VisitRow | undefined
     if (!row) return null
+    const places = await this.placesFor([row])
     const pageViews = this.db
       .prepare('SELECT path, created_at FROM page_views WHERE visit_id = ? ORDER BY created_at')
       .all(id) as { path: string; created_at: number }[]
@@ -441,18 +473,19 @@ export class AnalyticsDb {
       created_at: number
     }[]
     return {
-      ...this.present(row, reveal),
+      ...this.present(row, reveal, places),
       pageViews: pageViews.map((item) => ({ path: item.path, createdAt: item.created_at })),
       clicks: clicks.map((item) => ({ kind: item.kind, createdAt: item.created_at })),
     }
   }
 
-  exportVisits(filters: Filters, reveal: boolean, limit: number): StoredVisit[] {
+  async exportVisits(filters: Filters, reveal: boolean, limit: number): Promise<StoredVisit[]> {
     const where = this.where(filters)
     const rows = this.db
       .prepare(`SELECT * FROM visits WHERE ${where.sql} ORDER BY started_at DESC LIMIT ?`)
       .all(...where.args, limit) as VisitRow[]
-    return rows.map((row) => this.present(row, reveal))
+    const places = await this.placesFor(rows.slice(0, 200))
+    return rows.map((row) => this.present(row, reveal, places))
   }
 
   deleteVisits(ids: string[]): number {
@@ -480,9 +513,45 @@ export class AnalyticsDb {
     })
   }
 
-  private present(row: VisitRow, reveal: boolean): StoredVisit {
+  private async placesFor(rows: VisitRow[]): Promise<Map<string, Place | null>> {
+    const wanted = new Map<string, string>()
+    for (const row of rows) {
+      const plain = row.ip_cipher && row.ip_iv && row.ip_tag ? decryptIp(this.ipKey, row.ip_cipher, row.ip_iv, row.ip_tag) : null
+      if (!plain || !isPublicIp(plain)) continue
+      wanted.set(ipHash(plain), plain)
+    }
+    const places = new Map<string, Place | null>()
+    const pending: Promise<void>[] = []
+    for (const [hash, ip] of wanted) {
+      const cached = this.db
+        .prepare('SELECT country, region, city, looked_up_at FROM ip_locations WHERE ip_hash = ?')
+        .get(hash) as { country: string; region: string; city: string; looked_up_at: number } | undefined
+      const fresh = cached && Date.now() - cached.looked_up_at < LOCATION_TTL_MS
+      if (fresh) {
+        places.set(hash, cached.country || cached.region || cached.city ? cached : null)
+        continue
+      }
+      pending.push(
+        this.locate(ip).then((place) => {
+          const stored = place ?? { country: '', region: '', city: '' }
+          this.db
+            .prepare(
+              `INSERT INTO ip_locations (ip_hash, country, region, city, looked_up_at) VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(ip_hash) DO UPDATE SET country = excluded.country, region = excluded.region, city = excluded.city, looked_up_at = excluded.looked_up_at`,
+            )
+            .run(hash, stored.country, stored.region, stored.city, Date.now())
+          places.set(hash, place)
+        }),
+      )
+    }
+    await Promise.all(pending)
+    return places
+  }
+
+  private present(row: VisitRow, reveal: boolean, places: Map<string, Place | null> = new Map()): StoredVisit {
     const plain =
       row.ip_cipher && row.ip_iv && row.ip_tag ? decryptIp(this.ipKey, row.ip_cipher, row.ip_iv, row.ip_tag) : null
+    const place = plain && isPublicIp(plain) ? places.get(ipHash(plain)) : null
     return {
       id: row.id,
       visitorId: row.visitor_id,
@@ -500,29 +569,44 @@ export class AnalyticsDb {
       classification: row.classification,
       ip: reveal ? (plain ?? 'Unavailable') : maskIp(plain),
       ipAvailable: Boolean(plain),
+      location: formatPlace(place),
     }
   }
 }
 
-function bucketTrend(times: number[], range: Range): { start: number; label: string; visits: number }[] {
-  const buckets = new Map<number, number>()
+function ipHash(ip: string): string {
+  return createHash('sha256').update(ip).digest('hex')
+}
+
+function bucketTrend(rows: { visitorId: string; at: number }[], range: Range): { start: number; label: string; visitors: number }[] {
+  const buckets = new Map<number, Set<string>>()
   const starts: number[] = []
   let cursor = range.unit === 'day' ? startOfDay(range.start) : startOfHour(range.start)
   const end = range.end
   while (cursor <= end && starts.length < 48) {
     starts.push(cursor)
-    buckets.set(cursor, 0)
+    buckets.set(cursor, new Set())
     cursor = range.unit === 'day' ? cursor + 24 * 60 * 60 * 1000 : cursor + 60 * 60 * 1000
   }
-  for (const time of times) {
-    const key = range.unit === 'day' ? startOfDay(time) : startOfHour(time)
-    if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1)
+  for (const row of rows) {
+    const key = range.unit === 'day' ? startOfDay(row.at) : startOfHour(row.at)
+    buckets.get(key)?.add(row.visitorId)
   }
   return starts.map((start) => ({
     start,
-    label: formatNy(start),
-    visits: buckets.get(start) ?? 0,
+    label: trendLabel(start, range.unit),
+    visitors: buckets.get(start)?.size ?? 0,
   }))
+}
+
+function trendLabel(ms: number, unit: 'hour' | 'day'): string {
+  if (unit === 'day') {
+    return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' }).format(ms)
+  }
+  const hour = nyParts(ms).hour
+  const suffix = hour < 12 ? 'a' : 'p'
+  const shown = hour % 12 === 0 ? 12 : hour % 12
+  return `${shown}${suffix}`
 }
 
 function startOfDay(ms: number): number {

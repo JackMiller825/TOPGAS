@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api, errorMessage } from './api.ts'
+import { apiOrigin, apiUrl } from './origin.ts'
 
 type Filters = {
   range: 'today' | '24h' | '7d' | 'custom'
@@ -17,7 +18,8 @@ type Summary = {
   visits: number
   pageViews: number
   clicks: { buy: number; chart: number; telegram: number; x: number; total: number }
-  trend: { start: number; label: string; visits: number }[]
+  trend: { start: number; label: string; visitors: number }[]
+  trendUnit?: 'hour' | 'day'
   referrals: { host: string; visits: number }[]
   campaigns: { source: string; medium: string; campaign: string; visits: number }[]
   generatedAt: number
@@ -40,6 +42,7 @@ type Visit = {
   classification: string
   ip: string
   ipAvailable: boolean
+  location: string
   pageViews?: { path: string; createdAt: number }[]
   clicks?: { kind: string; createdAt: number }[]
 }
@@ -59,7 +62,6 @@ function formatNy(ms: number): string {
     timeZone: 'America/New_York',
     month: 'short',
     day: 'numeric',
-    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
@@ -267,9 +269,9 @@ export default function Dashboard() {
   }
 
   async function exportCsv() {
-    const response = await fetch(`/api/dashboard/analytics/export?${queryString(applied, includeIps ? { reveal: '1' } : {})}`, {
+    const response = await fetch(apiUrl(`/api/dashboard/analytics/export?${queryString(applied, includeIps ? { reveal: '1' } : {})}`), {
       headers: { 'x-csrf-token': csrf, accept: 'text/csv' },
-      credentials: 'same-origin',
+      credentials: apiOrigin() ? 'include' : 'same-origin',
       cache: 'no-store',
     })
     if (!response.ok) {
@@ -287,7 +289,11 @@ export default function Dashboard() {
   }
 
   const pages = Math.max(1, Math.ceil(total / pageSize))
-  const maxTrend = Math.max(1, ...(summary?.trend.map((bucket) => bucket.visits) ?? [1]))
+  const maxTrend = Math.max(1, ...(summary?.trend.map((bucket) => bucket.visitors) ?? [1]))
+  const peak =
+    summary && summary.trend.length > 0
+      ? summary.trend.reduce((best, bucket) => (bucket.visitors > best.visitors ? bucket : best), summary.trend[0])
+      : undefined
 
   if (phase !== 'ready') {
     return (
@@ -329,7 +335,7 @@ export default function Dashboard() {
           Log out
         </button>
       </div>
-      <p className="dash-note">Counts are estimates. Times are shown in America/New_York.</p>
+      <p className="dash-note">Each person is counted once. Times are America/New_York.</p>
       {notice && <p role="status">{notice}</p>}
       <form
         className="dash-filters"
@@ -418,21 +424,25 @@ export default function Dashboard() {
             {stale ? ' (stale)' : ''}
           </p>
           <section className="dash-stats" aria-label="Summary">
-            <article>
-              <p>Estimated active visitors</p>
+            <article className="is-lead">
+              <p>Active visitors</p>
               <strong>{summary.activeVisitors}</strong>
+              <span>Unique people online now</span>
             </article>
             <article>
-              <p>Browser visitors</p>
+              <p>Unique visitors</p>
               <strong>{summary.browserVisitors}</strong>
+              <span>Each person once in this range</span>
             </article>
             <article>
               <p>Visits</p>
               <strong>{summary.visits}</strong>
+              <span>Separate sessions</span>
             </article>
             <article>
               <p>Page views</p>
               <strong>{summary.pageViews}</strong>
+              <span>Loads and reloads</span>
             </article>
             <article>
               <p>CTA clicks</p>
@@ -443,19 +453,27 @@ export default function Dashboard() {
             </article>
           </section>
           <section className="dash-card" aria-labelledby="trend-heading">
-            <h2 id="trend-heading">Visit trend</h2>
-            {summary.trend.every((bucket) => bucket.visits === 0) ? (
-              <p>No visits in this range.</p>
+            <div className="dash-top">
+              <h2 id="trend-heading">Visit trend</h2>
+              <p className="dash-quiet">
+                {summary.trendUnit === 'day' ? 'Unique visitors per day' : 'Unique visitors per hour'}
+                {peak && peak.visitors > 0 ? ` · Peak ${peak.visitors} at ${peak.label}` : ''}
+              </p>
+            </div>
+            {summary.trend.every((bucket) => bucket.visitors === 0) ? (
+              <p>No visitors in this range.</p>
             ) : (
-              <ol className="dash-trend">
+              <div className="trend-chart" role="list" aria-label="Unique visitors over time">
                 {summary.trend.map((bucket) => (
-                  <li key={bucket.start}>
-                    <span>{bucket.label}</span>
-                    <span className="dash-bar" style={{ width: `${Math.max(4, (bucket.visits / maxTrend) * 100)}%` }} />
-                    <span>{bucket.visits}</span>
-                  </li>
+                  <div role="listitem" className="trend-col" key={bucket.start} title={`${bucket.label}: ${bucket.visitors} unique visitors`}>
+                    <span className="trend-count">{bucket.visitors > 0 ? bucket.visitors : ''}</span>
+                    <span className="trend-bar" aria-hidden="true">
+                      <span style={{ height: `${Math.max(bucket.visitors > 0 ? 8 : 0, (bucket.visitors / maxTrend) * 100)}%` }} />
+                    </span>
+                    <span className="trend-label">{bucket.label}</span>
+                  </div>
                 ))}
-              </ol>
+              </div>
             )}
           </section>
           <div className="dash-split">
@@ -522,6 +540,7 @@ export default function Dashboard() {
               <tr>
                 <th scope="col">Select</th>
                 <th scope="col">IP</th>
+                <th scope="col">Location</th>
                 <th scope="col">Visit start</th>
                 <th scope="col">Last seen</th>
                 <th scope="col">Page and section</th>
@@ -552,6 +571,7 @@ export default function Dashboard() {
                       {revealed[visit.id] ? 'Hide IP' : 'Reveal IP'}
                     </button>
                   </td>
+                  <td>{visit.location || 'Unavailable'}</td>
                   <td>{formatNy(visit.startedAt)}</td>
                   <td>{formatNy(visit.lastSeen)}</td>
                   <td>
@@ -593,6 +613,7 @@ export default function Dashboard() {
             <p>
               {detail.path} · {detail.section ?? 'no section'} · {detail.classification}
             </p>
+            <p>Location: {detail.location || 'Unavailable'}</p>
             <p>Started {formatNy(detail.startedAt)}. Last seen {formatNy(detail.lastSeen)}.</p>
             <h4>Page views</h4>
             {(detail.pageViews ?? []).length === 0 ? <p>No page views stored.</p> : (

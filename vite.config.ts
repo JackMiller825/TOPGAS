@@ -23,7 +23,7 @@ function pagesFallback(): Plugin {
       const css = names.find((name) => /^index-.*\.css$/.test(name))
       if (js) {
         fs.copyFileSync(path.join(assets, js), path.join(legacy, 'index-CyUzMM2u.js'))
-        for (const legacyName of ['index-BSCVoLQC.js', 'index-DTk6TEgC.js']) {
+        for (const legacyName of ['index-BSCVoLQC.js', 'index-DTk6TEgC.js', 'index-C6lwwhIU.js']) {
           if (js !== legacyName) fs.copyFileSync(path.join(assets, js), path.join(assets, legacyName))
         }
       }

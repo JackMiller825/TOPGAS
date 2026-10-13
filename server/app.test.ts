@@ -34,6 +34,7 @@ async function start(options: Partial<AppOptions> & { password?: string } = {}):
     now: () => clock.ms,
     sleep: async () => {},
     nodeEnv: 'test',
+    locate: async () => null,
     ...rest,
   })
   const server: Server = createServer((req, res) => {
@@ -385,11 +386,18 @@ test('collection dedupes retries, counts tabs once, and hides untrusted IPs', as
     assert.equal(summary.data.pageViews, 2)
     assert.equal(summary.data.browserVisitors, 1)
     assert.equal(summary.data.activeVisitors, 1)
+    const trend = summary.data.trend as { label: string; visitors: number }[]
+    assert.equal(trend.some((bucket) => bucket.label.includes(':')), false)
+    assert.equal(
+      trend.reduce((sum, bucket) => sum + bucket.visitors, 0),
+      1,
+    )
     assert.equal((summary.data.clicks as { buy: number }).buy, 1)
     const visits = await session.request('/api/dashboard/analytics/visits?range=today')
     const rows = visits.data.visits as { id: string; ip: string; referrer: string }[]
     assert.equal(rows[0]?.ip, '203.0.***.***')
     assert.equal(rows[0]?.referrer, 'example.com')
+    assert.equal((rows[0] as { location?: string }).location, 'Unavailable')
     const revealed = await session.request(`/api/dashboard/analytics/visits/${rows[0].id}?reveal=1`)
     assert.equal(revealed.data.ip, '203.0.113.9')
     const csv = await session.request('/api/dashboard/analytics/export?range=today', {
@@ -485,6 +493,31 @@ test('the public site origin can call the API with a partitioned cookie', async 
     })
     assert.equal(preflight.status, 204)
     assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://topgas.online')
+  } finally {
+    await session.stop()
+  }
+})
+
+test('a repeat visit stays one person and shows a coarse location', async () => {
+  const session = await start({
+    trustProxy: true,
+    trustedProxies: ['127.0.0.1'],
+    trustedIpHeader: 'cf-connecting-ip',
+    locate: async () => ({ country: 'Portugal', region: 'Lisbon', city: 'Lisbon' }),
+  })
+  try {
+    await collect(session, { type: 'pageview' }, { 'cf-connecting-ip': '203.0.113.44' })
+    session.clock.ms += 31 * 60 * 1000
+    await collect(session, { type: 'pageview' }, { 'cf-connecting-ip': '203.0.113.44' })
+    await login(session)
+    const summary = await session.request('/api/dashboard/analytics/summary?range=today')
+    assert.equal(summary.data.browserVisitors, 1)
+    assert.equal(summary.data.visits, 2)
+    const visits = await session.request('/api/dashboard/analytics/visits?range=today')
+    const rows = visits.data.visits as { location: string }[]
+    assert.equal(rows.length, 2)
+    assert.equal(rows[0]?.location, 'Lisbon, Portugal')
+    assert.equal(rows[1]?.location, 'Lisbon, Portugal')
   } finally {
     await session.stop()
   }
