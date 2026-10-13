@@ -11,8 +11,7 @@
  * - launchStatus
  * - links.buy, links.chart, links.x, links.telegram
  *
- * Deployment origin for this repository's GitHub Pages project site.
- * Sharing URLs use this origin. There is no custom domain.
+ * Public site origin. GitHub Pages redirects the project URL to this domain.
  */
 export type PendingValue = string | number | null
 
@@ -58,7 +57,7 @@ export const token: TokenConfig = {
   ownershipStatus: null,
   launchStatus: null,
   links: { buy: null, chart: null, x: null, telegram: null },
-  siteUrl: 'https://jackmiller825.github.io/TOPGAS',
+  siteUrl: 'https://topgas.online',
 }
 
 const ADDRESS_SHAPE = /^0x[a-fA-F0-9]{40}$/

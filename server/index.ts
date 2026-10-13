@@ -37,7 +37,7 @@ server.on('error', () => {
 })
 
 server.listen(port, host, () => {
-  console.log(`TOPGAS server listening on http://${host}:${port}/TOPGAS/`)
+  console.log(`TOPGAS server listening on http://${host}:${port}/`)
   console.log(`Dashboard: http://${host}:${port}/dashboard`)
 })
 

@@ -18,9 +18,9 @@ The site renders `[CONTRACT_ADDRESS]`, `[TOKENOMICS]`, and `[OFFICIAL_SOCIAL_LIN
 
 ## Deployment
 
-GitHub Pages project site: https://jackmiller825.github.io/TOPGAS/
+Public site: https://topgas.online/
 
-Vite `base` is `/TOPGAS/`. The workflow in `.github/workflows/pages.yml` publishes the `dist` build. Fragments such as `/#story` are handled by the browser. There is no custom domain.
+GitHub Pages publishes the `dist` build and redirects https://jackmiller825.github.io/TOPGAS/ to that domain. Vite `base` is `/` because the custom domain serves the site from the root. `public/CNAME` keeps the domain attached. Fragments such as `/#story` are handled by the browser.
 
 Local checks:
 
@@ -30,7 +30,7 @@ npm run build
 npm run lint
 ```
 
-Dev server path: `http://localhost:5173/TOPGAS/`. Add `?fixture=confirmed` in development to exercise copy-address and confirmed-link states. That fixture is removed from production builds.
+Dev server path: `http://localhost:5173/`. Add `?fixture=confirmed` in development to exercise copy-address and confirmed-link states. That fixture is removed from production builds.
 
 ## Visitor dashboard
 
@@ -44,6 +44,6 @@ npm run build
 npm start
 ```
 
-Local URLs when the server is running: `http://127.0.0.1:4173/TOPGAS/` and `http://127.0.0.1:4173/dashboard`. `npm run dev` exposes the same API for local development. Development and localhost traffic is excluded from the default counts; use the dashboard toggle to include it.
+Local URLs when the server is running: `http://127.0.0.1:4173/` and `http://127.0.0.1:4173/dashboard`. `npm run dev` exposes the same API for local development. Development and localhost traffic is excluded from the default counts; use the dashboard toggle to include it.
 
 If a TLS proxy terminates HTTPS in front of the Node process, set `TRUST_PROXY=1`, `TRUSTED_PROXIES` to that proxy's connecting address, and optionally `TRUSTED_IP_HEADER` (default `cf-connecting-ip`). Without that, visitor IPs are stored as unavailable and the session cookie is not marked Secure. This password does not replace a hosting platform's own sign-in.

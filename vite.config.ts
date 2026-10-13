@@ -31,8 +31,8 @@ function dashboardApi(): Plugin {
   }
 }
 
-// Project-site base for https://jackmiller825.github.io/TOPGAS/
+// https://topgas.online/ serves this Pages site from the domain root.
 export default defineConfig({
   plugins: [react(), dashboardApi(), pagesFallback()],
-  base: '/TOPGAS/',
+  base: '/',
 })
